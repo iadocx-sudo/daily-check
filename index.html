@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f4f8f">
+<title>毎日チェック</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Layout: 1カラムの帳面。上に日付と進捗の帯、下にセクション別チェック、末尾にメモ・追加・設定 */
+:root{
+  --bg:#f3f4f1; --surface:#fbfbf9; --ink:#1e2a2f; --muted:#5f6b70; --line:#d9ddd8;
+  --accent:#2f4f8f; --accent-soft:#e3e8f3; --done:#3f7a5c; --star:#b5791d; --danger:#a33c3c; --onacc:#ffffff;
+  --f-body:"Hiragino Sans","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --f-num:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#13181b; --surface:#1a2024; --ink:#e4e8e6; --muted:#97a2a6; --line:#2c353a;
+  --accent:#8ea8e0; --accent-soft:#243048; --done:#7cc29b; --star:#e0ad55; --danger:#e08585; --onacc:#13181b; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;padding-bottom:env(safe-area-inset-bottom,0px);-webkit-tap-highlight-color:transparent}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:env(safe-area-inset-top,0px);border-bottom:1px solid var(--line)}
+.top .wrap{padding-block:10px}
+.daterow{display:flex;align-items:center;gap:8px}
+.date{font-weight:700;font-size:1.3rem;flex:1;min-width:0;white-space:nowrap}
+.date small{font-size:.78rem;color:var(--muted);font-weight:500;margin-left:6px}
+.navbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:1.1rem;background:var(--surface);flex:none}
+.navbtn:disabled{opacity:.35;cursor:default}
+.pill{font-size:.75rem;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap;flex:none}
+.sync{color:var(--muted)}
+.sync.ok{color:var(--done)} .sync.err{color:var(--danger);border-color:var(--danger)}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-top:10px;padding-bottom:2px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{white-space:nowrap;padding:5px 12px;border-radius:999px;border:1px solid var(--line);font-size:.85rem;background:var(--surface)}
+.tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--onacc)}
+.tab.add{color:var(--muted);border-style:dashed}
+.prog{display:flex;align-items:center;gap:10px;margin-top:10px}
+.bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--done);transition:width .25s}
+.pct{font-size:.82rem;min-width:7.5em;text-align:right}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+
+.sum{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:16px}
+.streak{font-size:.82rem;color:var(--muted)}
+.streak b{font-family:var(--f-num);font-size:1.4rem;color:var(--ink);margin-right:2px}
+.hist{display:flex;gap:4px;flex:1;justify-content:flex-end;min-width:0}
+.hist button{width:16px;height:22px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}
+.hist button.cur{outline:2px solid var(--accent);outline-offset:1px}
+.hist button span{position:absolute;left:0;right:0;bottom:0;background:var(--done)}
+.listhead{margin-top:16px}
+.listhead h1{font-size:1.45rem;margin:0;line-height:1.3}
+.listhead p{margin:4px 0 0;color:var(--muted);font-size:.85rem}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.chip{font-size:.8rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.chip.warn{color:var(--danger);border-color:var(--danger)}
+
+.sec{margin-top:22px}
+.sechead{display:flex;align-items:baseline;gap:10px;width:100%;text-align:left;padding-block:4px;border-bottom:1px solid var(--line)}
+.sechead .idx{font-family:var(--f-num);font-size:.8rem;color:var(--accent)}
+.sechead h2{font-size:1rem;font-weight:700;margin:0;flex:1;min-width:0}
+.sechead .cnt{font-size:.78rem;color:var(--muted)}
+.sechead .cnt.full{color:var(--done)}
+.sechead .car{color:var(--muted);font-size:.75rem;transition:transform .2s}
+.sec.closed .car{transform:rotate(-90deg)}
+.items{list-style:none;margin:0;padding:0}
+.item{border-bottom:1px dashed var(--line);padding-block:10px}
+.itemline{display:flex;gap:8px;align-items:flex-start}
+.row{display:flex;gap:12px;align-items:flex-start;cursor:pointer;flex:1;min-width:0}
+.row input{position:absolute;opacity:0;width:1px;height:1px}
+.box{flex:none;width:24px;height:24px;border-radius:6px;border:2px solid var(--muted);margin-top:1px;display:grid;place-items:center;background:var(--surface)}
+.row input:checked+.box{background:var(--done);border-color:var(--done)}
+.row input:checked+.box::after{content:"";width:6px;height:11px;border:solid var(--surface);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.row input:focus-visible+.box{outline:2px solid var(--accent);outline-offset:2px}
+.txt{flex:1;min-width:0;word-break:break-word}
+.row input:checked~.txt{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.star{color:var(--star);font-weight:700;margin-right:3px}
+.ebtn{font-size:.75rem;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted);flex:none}
+details{margin:6px 0 0 36px}
+summary{font-size:.78rem;color:var(--accent);cursor:pointer;width:max-content;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ "} details[open] summary::before{content:"▾ "}
+.detail{margin-top:6px;padding:10px 12px;background:var(--accent-soft);border-radius:8px;font-size:.86rem;white-space:pre-wrap;line-height:1.7;overflow-wrap:anywhere}
+
+.form{display:grid;gap:8px;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.form label{font-size:.75rem;color:var(--muted);display:grid;gap:3px}
+.in{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+textarea.in{min-height:90px;resize:vertical}
+.inl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ck{display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--ink)}
+.btn{padding:7px 14px;border-radius:8px;border:1px solid var(--line);font-size:.85rem;background:var(--surface)}
+.btn:disabled{opacity:.4}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--onacc)}
+.btn.del{color:var(--danger);border-color:var(--danger)}
+.spacer{flex:1}
+.block{margin-top:28px}
+.block h3{font-size:.8rem;letter-spacing:.08em;color:var(--muted);margin:0 0 6px;font-weight:700}
+.memo{width:100%;min-height:70px;resize:vertical;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.note{font-size:.75rem;color:var(--muted);margin-top:4px}
+.empty{margin-top:40px;padding:24px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center}
+.foot{margin:36px 0 40px;font-size:.72rem;color:var(--muted);text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.85rem;z-index:20;max-width:calc(100% - 32px)}
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap">
+  <div class="daterow">
+    <button class="navbtn" id="prev" data-act="prev" aria-label="前の日">‹</button>
+    <div class="date" id="date">—</div>
+    <button class="pill" id="todaybtn" data-act="today">今日</button>
+    <button class="pill sync" id="sync" data-act="gosettings">端末に保存</button>
+    <button class="navbtn" id="next" data-act="next" aria-label="次の日">›</button>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="prog"><div class="bar"><i id="barfill" style="width:0"></i></div><div class="pct num" id="pct">0 / 0</div></div>
+</div></div>
+
+<div class="wrap">
+  <div id="main"></div>
+
+  <div class="block" id="memoblock">
+    <h3>今日のメモ</h3>
+    <textarea class="memo" id="memo" placeholder="午後の最重要1つ、今夜の時間（0H／1H／2H）など"></textarea>
+    <div class="note" id="memonote">入力は自動で保存されます</div>
+  </div>
+
+  <div class="block" id="addblock">
+    <h3>項目を追加</h3>
+    <form class="form" id="addform">
+      <label>セクション<select class="in" id="add-sec"></select></label>
+      <label>チェック項目<input class="in" type="text" id="add-text" placeholder="例：午後イチに水を500ml" required></label>
+      <label>詳細（任意・折りたたみ表示）<textarea class="in" id="add-detail" placeholder="なぜ効くか、手順など"></textarea></label>
+      <div class="inl"><label class="ck"><input type="checkbox" id="add-star"> ★重要</label><span class="spacer"></span><button class="btn pri" type="submit">追加</button></div>
+    </form>
+  </div>
+
+  <div class="block" id="settings">
+    <h3>同期（PCとスマホ）</h3>
+    <div class="form">
+      <label>GitHubのトークン（gist権限）<input class="in" type="text" id="ghToken" autocomplete="off" spellcheck="false" placeholder="ghp_… または github_pat_…"></label>
+      <div class="inl"><button class="btn pri" type="button" data-act="syncnow">保存して同期</button><button class="btn" type="button" data-act="syncoff">同期をやめる</button></div>
+      <div class="note" id="syncNote">PCとスマホに同じGitHubアカウントのトークンを入れると、リスト・チェック・メモが自動で同期されます。データはあなたのGitHubの非公開Gistに保存されます。</div>
+    </div>
+    <h3 style="margin-top:20px">バックアップ</h3>
+    <div class="inl">
+      <button class="btn" type="button" data-act="bk-save">書き出す（JSON）</button>
+      <label class="btn" for="bk-file" style="cursor:pointer">読み込む</label>
+      <input type="file" id="bk-file" accept=".json,application/json" hidden>
+      <button class="btn pri" type="button" id="bk-apply" data-act="bk-apply" hidden>読み込みを実行</button>
+    </div>
+    <div class="note" id="bk-note">全リストと全日付の記録を1ファイルに保存します。読み込むと、新しい方の内容で統合されます。</div>
+    <div id="nativebox" hidden>
+      <h3 style="margin-top:20px">通知（アプリ版）</h3>
+      <div class="inl"><button class="btn" type="button" data-act="testnotify">テスト通知を出す</button></div>
+      <div class="note">各リストの「編集」で通知時刻を設定できます。その日のチェックが全部終わっていれば通知しません。</div>
+    </div>
+  </div>
+  <div class="foot">毎日チェック <span id="ver"></span></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜3分　達観プライミング：朝・昼に1分で読む", "order": 1, "sections": [{"id": "hs0", "title": "重要ポイント（最初に1回読む）", "items": [{"id": "h0_0", "text": "不安が注意を狭め、リラックスが周辺視野を広げる", "detail": "反芻を止め、脳をクリアにする。好機の看板に気づける人になる。", "star": false}]}, {"id": "hs1", "title": "体を戻す", "items": [{"id": "h1_0", "text": "1分呼吸（共鳴呼吸＝1分6回）＋25分タイマーを再セット", "detail": "決定：1分呼吸を「全アクションの起点」にする。25分に一度1分（10秒呼吸に意識を向ける）。\nなぜ効く：呼吸は「やる気」でなく「きっかけ不足」で続かない。行動の前に固定すると、\n　既存の行動すべてが自動のきっかけになる（habit stacking）。思考をいじる前に自律神経を下げる方が速い。\n手順：各タスクを始める直前に、長い呼気を1回。特に固定するのは\n　・PCで作業を始める前\n　・会議、面談の前\n　・メール、チャットを返す前\n　・移動、待ち時間（エレベーター、信号）", "star": false}, {"id": "h1_1", "text": "笑顔／肩を落とす／腹を凹ませる", "detail": "", "star": true}, {"id": "h1_2", "text": "水は午前で1L飲めたか", "detail": "", "star": false}, {"id": "h1_3", "text": "午後の休憩ルール：50分作業＋5分休憩（1時間に1回は休憩）", "detail": "", "star": false}, {"id": "h1_4", "text": "瞑想：今日あと何回か（×3回 or 合計10分）", "detail": "", "star": false}]}, {"id": "hs2", "title": "頭を戻す", "items": [{"id": "h2_0", "text": "反芻や不安を、頭の中で考えていないか", "detail": "悩まない運用＝「自分の頭を信頼しない・頭で抱えない」\n決定：優柔不断を断つ。頭の中で考えない。10分以上はAIで悩まない。\nなぜ効く：頭の中の反芻はワーキングメモリを食い、最良探し（maximizing）で結論が出ない。\n　外に出した瞬間に停止できる。そもそも悩む2択に有意差はほぼない。\n手順（段階的に外へ出す）：\n　・5分で決まらない → ノートに書く（頭から出す）\n　・10分で決まらない → AIに投げる（自分の頭で抱えない）", "star": false}, {"id": "h2_1", "text": "意味付けしていないか", "detail": "", "star": true}, {"id": "h2_2", "text": "課題の分離：業者・相手に投げた時点で、私の手を離れている", "detail": "相手がどう吠えてこようが、業者に投げた時点で私の手を離れている。\nそれからの遅延についてなんと言おうが知ったこと。", "star": false}, {"id": "h2_3", "text": "一歩引いて考えたか", "detail": "「これは言うべきか？」「これは自分の課題か？」\n「この90点のゴールはどこか（メタ認知）」「AIで代替できないか？」", "star": false}, {"id": "h2_4", "text": "「〇〇、今どうする？」と自分に聞く（メタ認知＋不完全主義）", "detail": "決定：常に一歩引いて物事を捉える。どうしたらこの仕事は無駄なく終わるか。\n　悩んだ際は、ノートに別認証として記載。\nなぜ効く：一人称「なぜ私は動揺しているのか」は反芻を強める。自分の名前＋二人称にすると、\n　他人に助言する時の冷静な認知モードが起動する（ソロモンのパラドックス＝人は他人の問題には賢く答えられる）。\n　認知負荷ほぼゼロで即使える（Kross 2014）。\n実践フレーズ：\n　「これのゴールはどこだ。AIでの解決は可能か。」\n　「課題の分離をするとどうなるか。どこまでが事実で、どこからが妄想か。私に対応できるのはどこまでか。」\n　「過去のことは考えても、振り返るな。」\n自動発火のif-then：\n　カッとした／不安で胸がざわついたら → 心の中で「〇〇、今どうする？」\n　ここで答えを出そうとしない。距離を取る問いを1回入れるだけ。答えは落ち着いてから。", "star": false}, {"id": "h2_5", "text": "達観思考：事実と解釈を分け、前だけ見る", "detail": "", "star": false}, {"id": "h2_6", "text": "全力感謝／ツイてる（午前の良かったことを1つ思い出す）", "detail": "", "star": false}]}, {"id": "hs3", "title": "午後を決める", "items": [{"id": "h3_0", "text": "午後の最重要1つを決める（選択と集中）", "detail": "", "star": false}, {"id": "h3_1", "text": "カエルを食べる：昨日のメール・厄介な未完了に少しでも着手", "detail": "朝のカエル手順（先送りを断つ実装）\n決定：今日の仕事の確認 →（急ぎの今日の仕事）→ 昨日のメール対応 → 今日の仕事、の順でカエルを食べる。\nなぜ効く：「昨日の案件に必ず着手」を固定順に埋め込むと、先送り（慢性ストレス源）が物理的に封じ込まれる。\n手順：\n　1. 今日の仕事をざっと確認（＋5分ブレインダンプで気がかりを全部出す）\n　2. 今日必須の急ぎだけ先に処理\n　3. 昨日のメール／案件に必ず着手（ここが要）\n　4. 残りの今日の仕事", "star": false}, {"id": "h3_2", "text": "気がかり・未完了タスクを書き出した（アップノート）", "detail": "", "star": false}, {"id": "h3_3", "text": "メールチェックは1日3回まで（午後はあと何回か）", "detail": "", "star": false}]}, {"id": "hs4", "title": "午後の場面別ルール（その場で使う）", "items": [{"id": "h4_0", "text": "カッとしたら：長い呼吸 → 発言しない", "detail": "つまらないジョークを言わない。人を悪く言わない。どうせ後で反芻して時間と精神を削る。\n相手のためではなく、自分の余力を守るために怒らない。言わない。\n決定：苛立ったら発言しない（だいたい後で後悔する）。まず長い呼吸を一拍。\nなぜ効く：頭が落ちた\"ホット状態\"で言葉を出すと後悔→反芻。\n　必要なのは感情を消すことでなく、感情と行動を切り離す＝反応を遅らせること。\n　身体（呼吸）が先、頭を使う再解釈は後（コールド時）。\n手順（カッとなった瞬間）：\n　1. 長い呼気を1回（身体、思考不要）\n　2. 発言・返信を保留（即レス禁止 → 10分後 or 翌日に判断）\n　　「逃げられるなら、確認して明日連絡します」スタンス\n　3. 席を立つ／水を飲む（運動指令に逃がす）\n　4. 犬が吠えている、と考える\nその場レバー（身体で戻す）：深い呼吸とアロマ／水を飲む／立って歩く30秒／目薬の点眼／\n　肩を落として姿勢を正す／冷たい水で手を洗う・顔に触れる／脈を図ることに集中する\n共通原理：頭で考え直すのでなく、身体・感覚・視線を動かして注意を切る。", "star": false}, {"id": "h4_1", "text": "話すとき：結論 → 根拠 → たとえ → 相手の次の行動", "detail": "論理的に話し、達観的な思考を持つ。3点に削る。これだけで30秒は成立する。\n型：\n　1. 結論を先に一言（「AよりBがいい」）\n　2. 根拠を1〜3個（「理由は〜だから」）\n　3. 具体例かたとえを1つ（「たとえば〜」）\n　4. 相手の次の行動（「だから〜してほしい」）\n効かせるコツ：\n　・目的は「相手が動く」こと。うまく話すことではない\n　・相手の頭にある言葉に合わせる（難しい語彙は不要）\n　・主観、言い訳、希望的観測は必ず削る。削った方が伝わる\n　・全体像 → 詳細の順。いきなり細部に入らない", "star": false}]}, {"id": "hs5", "title": "今夜を決める", "items": [{"id": "h5_0", "text": "禁止doを確認した", "detail": "", "star": false}, {"id": "h5_1", "text": "今夜の自分の時間：0H／1H／2H のどれにするか決める", "detail": "", "star": false}]}], "id": "hiru", "updated": 1, "remind": "12:30"};
+
+(function(){
+"use strict";
+const VER="1.0.0", GOAL=0.8;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const N=window.DCNative||null;
+const pad=n=>String(n).padStart(2,"0");
+const fmt=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const todayStr=()=>fmt(new Date());
+const addDays=(s,n)=>{const d=new Date(s+"T12:00:00");d.setDate(d.getDate()+n);return fmt(d)};
+const wd=s=>"日月火水木金土"[new Date(s+"T12:00:00").getDay()];
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+/* ---------- data ---------- */
+// lists: {id:{id,title,subtitle,order,updated,remind,sections:[{id,title,items:[{id,text,detail,star}]}]}}
+// days: {date:{c:{listId:{itemId:[bool,t]}}, m:{listId:[text,t]}}}
+// tombs: {listId:t}
+let D=LS.get("dc.data",null);
+if(!D||!D.lists){D={lists:{},days:{},tombs:{}};D.lists[SEED.id]=clone(SEED)}
+D.days=D.days||{};D.tombs=D.tombs||{};
+const S={listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
+  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),confirm:null,addingList:false};
+
+function persist(){LS.set("dc.data",D)}
+const listsArr=()=>Object.values(D.lists).sort((a,b)=>(a.order||0)-(b.order||0)||(a.title<b.title?-1:1));
+const cur=()=>D.lists[S.listId]||listsArr()[0]||null;
+const allItems=l=>l?l.sections.flatMap(s=>s.items):[];
+const checksOf=(lid,d)=>((D.days[d]||{}).c||{})[lid]||{};
+const isOn=(lid,iid,d)=>{const v=checksOf(lid,d)[iid];return !!(v&&v[0])};
+function ratio(l,d){const it=allItems(l);if(!it.length)return 0;return it.filter(i=>isOn(l.id,i.id,d)).length/it.length}
+function streak(l){const t=todayStr();let d=ratio(l,t)>=GOAL?t:addDays(t,-1),n=0;while(ratio(l,d)>=GOAL&&n<800){n++;d=addDays(d,-1)}return n}
+function touchList(l){l.updated=Date.now();D.lists[l.id]=l;persist();schedulePush();pushNative()}
+function setCheck(lid,iid,on){const d=S.date,day=D.days[d]=D.days[d]||{c:{},m:{}};day.c=day.c||{};const c=day.c[lid]=day.c[lid]||{};c[iid]=[!!on,Date.now()];persist();schedulePush();pushNative()}
+function setMemo(lid,text){const d=S.date,day=D.days[d]=D.days[d]||{c:{},m:{}};day.m=day.m||{};day.m[lid]=[text,Date.now()];persist();schedulePush()}
+const memoOf=(lid,d)=>{const v=((D.days[d]||{}).m||{})[lid];return v?v[0]:""};
+
+/* ---------- merge (used by sync and backup import) ---------- */
+function mergeData(R){
+  if(!R||typeof R!=="object")return;
+  const T=Object.assign({},R.tombs||{});for(const k in D.tombs)T[k]=Math.max(T[k]||0,D.tombs[k]);
+  const L={};for(const l of [...Object.values(R.lists||{}),...Object.values(D.lists)]){
+    if(!l||!l.id||!Array.isArray(l.sections))continue;const o=L[l.id];if(!o||(+l.updated||0)>(+o.updated||0))L[l.id]=l}
+  for(const k in L)if((T[k]||0)>=(+L[k].updated||0))delete L[k];
+  const cut=Date.now()-120*864e5;for(const k in T)if(T[k]<cut)delete T[k];
+  const days=clone(D.days),rd=R.days||{};
+  for(const d in rd){if(!/^\d{4}-\d{2}-\d{2}$/.test(d))continue;const a=days[d]=days[d]||{c:{},m:{}},b=rd[d]||{};a.c=a.c||{};a.m=a.m||{};
+    for(const lid in (b.c||{})){const ac=a.c[lid]=a.c[lid]||{};for(const iid in b.c[lid]){const v=b.c[lid][iid];if(Array.isArray(v)&&(!ac[iid]||v[1]>ac[iid][1]))ac[iid]=v}}
+    for(const lid in (b.m||{})){const v=b.m[lid];if(Array.isArray(v)&&(!a.m[lid]||v[1]>a.m[lid][1]))a.m[lid]=v}}
+  const keep=addDays(todayStr(),-500);for(const d in days)if(d<keep)delete days[d];
+  D={lists:L,days,tombs:T};persist();
+}
+function stable(o){if(Array.isArray(o))return "["+o.map(stable).join(",")+"]";if(o&&typeof o==="object")return "{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+stable(o[k])).join(",")+"}";return JSON.stringify(o)}
+
+/* ---------- GitHub Gist sync ---------- */
+const GH="https://api.github.com",GFILE="daily-check.json",GDESC="daily-check sync (do not delete)";
+let gh=LS.get("dc.gh",null);
+if(!gh){const y=LS.get("yn.gh",null);gh={token:y&&y.token||"",gist:"",borrowed:!!(y&&y.token)};LS.set("dc.gh",gh)}
+let syncing=false,again=false,pushT=null;
+function setSync(t,cls){const b=$("sync");b.textContent=t;b.className="pill sync"+(cls?" "+cls:"")}
+const ghH=()=>({"Authorization":"Bearer "+gh.token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
+async function ghFetch(path,opt={}){
+  const r=await fetch(GH+path,Object.assign({cache:"no-store"},opt,{headers:Object.assign(ghH(),opt.body?{"Content-Type":"application/json"}:{})}));
+  if(r.status===401)throw new Error("トークンが無効です");
+  if(r.status===403||(r.status===404&&path==="/gists"))throw new Error("トークンにgist権限がありません");
+  if(!r.ok)throw new Error("GitHubエラー "+r.status);
+  return r.json();
+}
+async function findGist(){
+  if(gh.gist){try{return await ghFetch("/gists/"+gh.gist)}catch(e){if(/無効|権限/.test(e.message))throw e;gh.gist=""}}
+  for(let p=1;p<=5;p++){const list=await ghFetch("/gists?per_page=100&page="+p);
+    const g=list.find(x=>x.files&&x.files[GFILE]);if(g){gh.gist=g.id;LS.set("dc.gh",gh);return await ghFetch("/gists/"+g.id)}
+    if(list.length<100)break}
+  return null;
+}
+async function sync(){
+  if(!gh.token)return;if(syncing){again=true;return}syncing=true;setSync("同期中…");
+  try{
+    const g=await findGist();let before="";
+    if(g){const f=g.files[GFILE];let txt=f.content;if(f.truncated)txt=await (await fetch(f.raw_url,{cache:"no-store"})).text();
+      before=txt;try{mergeData(JSON.parse(txt))}catch(_){}}
+    const out=stable({app:"daily-check",v:1,lists:D.lists,days:D.days,tombs:D.tombs});
+    if(out!==before){
+      if(g)await ghFetch("/gists/"+g.id,{method:"PATCH",body:JSON.stringify({files:{[GFILE]:{content:out}}})});
+      else{const ng=await ghFetch("/gists",{method:"POST",body:JSON.stringify({description:GDESC,public:false,files:{[GFILE]:{content:out}}})});gh.gist=ng.id;LS.set("dc.gh",gh)}
+    }
+    const d=new Date();setSync("同期済み "+d.getHours()+":"+pad(d.getMinutes()),"ok");
+    $("syncNote").textContent="同期できています（リスト"+Object.keys(D.lists).length+"件）。"+(gh.borrowed?"よみあげノートのトークンを使っています。":"");
+    render();pushNative();
+  }catch(e){setSync("同期エラー","err");$("syncNote").textContent="同期できませんでした："+(e.message||"通信エラー")+"。電波やトークンを確認してください。"}
+  finally{syncing=false;if(again){again=false;sync()}}
+}
+function schedulePush(){if(!gh.token)return;clearTimeout(pushT);pushT=setTimeout(sync,1500)}
+
+/* ---------- native bridge (APK) ---------- */
+let lastRem="",lastProg="";
+function pushNative(){
+  if(!N)return;
+  try{
+    const rem=JSON.stringify(listsArr().filter(l=>/^\d{1,2}:\d{2}$/.test(l.remind||"")).map(l=>({id:l.id,title:l.title,time:l.remind})));
+    if(rem!==lastRem){lastRem=rem;N.setReminders(rem)}
+    const t=todayStr(),prog=JSON.stringify(listsArr().map(l=>{const it=allItems(l);return{id:l.id,date:t,done:it.filter(i=>isOn(l.id,i.id,t)).length,total:it.length}}));
+    if(prog!==lastProg){lastProg=prog;N.setProgress(prog)}
+  }catch(e){}
+}
+window.__dcOpen=id=>{if(D.lists[id]){S.listId=id;S.date=todayStr();LS.set("dc.list",id);render();scrollTo(0,0)}};
+window.__dcShare=text=>{const l=cur();if(!l)return;$("add-text").value=String(text).split("\n")[0].slice(0,200);$("add-detail").value=String(text).split("\n").slice(1).join("\n").trim();$("addblock").scrollIntoView({behavior:"smooth"});toast("共有された文章を追加欄に入れました")};
+
+/* ---------- toast ---------- */
+let toastT;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2200)}
+
+/* ---------- render ---------- */
+function renderTop(){
+  const t=todayStr(),d=S.date,l=cur();
+  $("date").innerHTML=`${esc(d.slice(5).replace("-","/"))}（${wd(d)}）<small>${d===t?"今日":esc(d.slice(0,4))}</small>`;
+  $("next").disabled=d>=t;$("todaybtn").hidden=d===t;
+  $("tabs").innerHTML=listsArr().map(x=>`<button class="tab" data-act="tab" data-list="${esc(x.id)}" aria-pressed="${!!l&&l.id===x.id}">${esc(x.title)}</button>`).join("")+`<button class="tab add" data-act="addlist">＋ リスト</button>`;
+  const it=allItems(l),n=l?it.filter(i=>isOn(l.id,i.id,d)).length:0;
+  $("barfill").style.width=(it.length?n/it.length*100:0)+"%";
+  $("pct").textContent=`${n} / ${it.length}　${it.length?Math.round(n/it.length*100):0}%`;
+}
+function renderSide(){
+  const l=cur();$("memoblock").hidden=!l||S.addingList;$("addblock").hidden=!l||S.addingList;if(!l)return;
+  const m=$("memo");if(document.activeElement!==m)m.value=memoOf(l.id,S.date);
+  const sel=$("add-sec"),v=sel.value;sel.innerHTML=l.sections.map(s=>`<option value="${esc(s.id)}">${esc(s.title)}</option>`).join("");
+  if(l.sections.some(s=>s.id===v))sel.value=v;
+}
+function itemHTML(l,s,it,i){
+  const on=isOn(l.id,it.id,S.date);
+  if(S.editing===it.id){const D2=S.draft;return `<li class="item"><div class="form">
+    <label>チェック項目<input class="in" type="text" id="ed-text" value="${esc(D2.text)}"></label>
+    <label>詳細（折りたたみ表示）<textarea class="in" id="ed-detail">${esc(D2.detail)}</textarea></label>
+    <div class="inl"><label class="ck"><input type="checkbox" id="ed-star" ${D2.star?"checked":""}> ★重要</label><span class="spacer"></span>
+      <button class="btn" type="button" data-act="i-up" data-item="${esc(it.id)}" ${i===0?"disabled":""}>↑</button>
+      <button class="btn" type="button" data-act="i-down" data-item="${esc(it.id)}" ${i===s.items.length-1?"disabled":""}>↓</button></div>
+    <div class="inl"><button class="btn del" type="button" data-act="i-del" data-item="${esc(it.id)}">${S.confirm==="i"+it.id?"もう一度押すと削除":"削除"}</button><span class="spacer"></span>
+      <button class="btn" type="button" data-act="i-cancel">やめる</button><button class="btn pri" type="button" data-act="i-save" data-item="${esc(it.id)}">保存</button></div></div></li>`}
+  if(S.onlyOpen&&on&&!S.edit)return "";
+  return `<li class="item"><div class="itemline"><label class="row"><input type="checkbox" id="c-${esc(it.id)}" data-act="check" data-item="${esc(it.id)}" ${on?"checked":""}><span class="box"></span>
+    <span class="txt">${it.star?'<span class="star">★</span>':""}${esc(it.text)}</span></label>
+    ${S.edit?`<button class="ebtn" data-act="i-edit" data-item="${esc(it.id)}">編集</button>`:""}</div>
+    ${it.detail?`<details data-det="${esc(it.id)}" ${S.openDet.has(it.id)?"open":""}><summary>詳細</summary><div class="detail">${esc(it.detail)}</div></details>`:""}</li>`;
+}
+function renderMain(){
+  const l=cur(),M=$("main");
+  if(S.addingList||!l){
+    M.innerHTML=`${!l?'<div class="empty">リストがありません。名前を付けて最初のリストを作ってください。</div>':""}
+    <form class="form" id="newlist" style="margin-top:18px"><label>新しいリストの名前<input class="in" type="text" id="nl-title" placeholder="例：朝のチェック" required></label>
+    <label>説明（任意）<input class="in" type="text" id="nl-sub" placeholder="例：7:30／3分"></label>
+    <label>通知時刻（任意・アプリ版）<input class="in" type="time" id="nl-time"></label>
+    <div class="inl"><span class="spacer"></span>${l?'<button class="btn" type="button" data-act="nl-cancel">やめる</button>':""}<button class="btn pri" type="submit">作成</button></div></form>`;return}
+  const st=streak(l),t=todayStr(),hist=[];
+  for(let k=13;k>=0;k--){const d=addDays(t,-k),r=ratio(l,d);hist.push(`<button data-act="jump" data-date="${d}" class="${d===S.date?"cur":""}" title="${d.slice(5)} ${Math.round(r*100)}%" aria-label="${d} ${Math.round(r*100)}%"><span style="height:${Math.round(r*100)}%;opacity:${r>=GOAL?1:.55}"></span></button>`)}
+  let h=`<div class="sum"><div class="streak"><b>${st}</b>日連続（${Math.round(GOAL*100)}%以上で達成）</div><div class="hist">${hist.join("")}</div></div>`;
+  if(S.edit){h+=`<div class="form" style="margin-top:16px"><label>リスト名<input class="in" type="text" id="l-title" value="${esc(l.title)}"></label>
+    <label>説明<input class="in" type="text" id="l-sub" value="${esc(l.subtitle||"")}"></label>
+    <label>通知時刻（アプリ版・空欄で通知なし）<input class="in" type="time" id="l-time" value="${esc(l.remind||"")}"></label>
+    <div class="inl"><button class="btn del" type="button" data-act="l-del">${S.confirm==="l"?"もう一度押すとリストごと削除":"リストを削除"}</button><span class="spacer"></span><button class="btn pri" type="button" data-act="l-save">保存</button></div></div>`}
+  else h+=`<div class="listhead"><h1>${esc(l.title)}</h1>${l.subtitle||l.remind?`<p>${esc(l.subtitle||"")}${l.remind?`　🔔 ${esc(l.remind)}`:""}</p>`:""}</div>`;
+  h+=`<div class="tools"><button class="chip" data-act="only" aria-pressed="${S.onlyOpen}">未チェックのみ</button>
+    <button class="chip" data-act="openall">詳細を${S.openDet.size?"閉じる":"すべて開く"}</button>
+    <button class="chip" data-act="edit" aria-pressed="${S.edit}">${S.edit?"編集を終える":"編集"}</button>
+    <button class="chip ${S.confirm==="reset"?"warn":""}" data-act="reset">${S.confirm==="reset"?"もう一度押すとリセット":"この日をリセット"}</button></div>`;
+  l.sections.forEach((s,si)=>{
+    const n=s.items.filter(i=>isOn(l.id,i.id,S.date)).length,closed=S.collapsed.has(s.id)&&!S.edit;
+    const body=s.items.map((it,i)=>itemHTML(l,s,it,i)).join("");
+    h+=`<section class="sec ${closed?"closed":""}">`;
+    if(S.edit){h+=`<div class="form"><label>セクション名<input class="in" type="text" data-sec-title="${esc(s.id)}" value="${esc(s.title)}"></label>
+      <div class="inl"><button class="btn" data-act="s-up" data-sec="${esc(s.id)}" ${si===0?"disabled":""}>↑</button><button class="btn" data-act="s-down" data-sec="${esc(s.id)}" ${si===l.sections.length-1?"disabled":""}>↓</button>
+      <button class="btn del" data-act="s-del" data-sec="${esc(s.id)}">${S.confirm==="s"+s.id?"もう一度押すと項目ごと削除":"削除"}</button><span class="spacer"></span>
+      <button class="btn pri" data-act="s-save" data-sec="${esc(s.id)}">名前を保存</button></div></div>`}
+    else h+=`<button class="sechead" data-act="sec" data-sec="${esc(s.id)}" aria-expanded="${!closed}"><span class="idx num">${si}</span><h2>${esc(s.title)}</h2><span class="cnt num ${n===s.items.length&&n?"full":""}">${n}/${s.items.length}</span><span class="car">▾</span></button>`;
+    if(!closed)h+=`<ul class="items">${body||(S.onlyOpen&&s.items.length?'<li class="item" style="color:var(--muted);font-size:.85rem">すべてチェック済み</li>':"")}</ul>`;
+    h+=`</section>`;
+  });
+  if(S.edit)h+=`<div class="inl" style="margin-top:18px"><input class="in" type="text" id="new-sec" style="flex:1;min-width:0" placeholder="新しいセクション名"><button class="btn pri" data-act="s-add">セクション追加</button></div>`;
+  M.innerHTML=h;
+}
+function render(){renderTop();renderSide();if(S.editing)return;renderMain()}
+
+/* ---------- events ---------- */
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.dataset&&el.dataset.act==="check"){const l=cur();setCheck(l.id,el.dataset.item,el.checked);renderTop();
+    if(S.onlyOpen)setTimeout(()=>{if(!S.editing)renderMain()},350);else renderMain();return}
+  if(el.id==="bk-file")readBackup(el);
+});
+document.addEventListener("toggle",e=>{const id=e.target.dataset&&e.target.dataset.det;if(!id)return;e.target.open?S.openDet.add(id):S.openDet.delete(id)},true);
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]");if(!b||b.dataset.act==="check")return;
+  const a=b.dataset.act,l=cur(),t=todayStr();
+  if(!["reset","i-del","s-del","l-del"].includes(a))S.confirm=null;
+  const findSec=id=>l.sections.find(s=>s.id===id);
+  const findItem=id=>{for(const s of l.sections){const i=s.items.findIndex(x=>x.id===id);if(i>=0)return[s,i]}return[null,-1]};
+  switch(a){
+    case"prev":S.date=addDays(S.date,-1);break;
+    case"next":if(S.date<t)S.date=addDays(S.date,1);break;
+    case"today":S.date=t;break;
+    case"jump":S.date=b.dataset.date;break;
+    case"tab":S.listId=b.dataset.list;LS.set("dc.list",S.listId);S.addingList=false;S.editing=null;break;
+    case"addlist":S.addingList=true;S.editing=null;break;
+    case"nl-cancel":S.addingList=false;break;
+    case"gosettings":$("settings").scrollIntoView({behavior:"smooth"});return;
+    case"only":S.onlyOpen=!S.onlyOpen;LS.set("dc.only",S.onlyOpen);break;
+    case"openall":if(S.openDet.size)S.openDet.clear();else allItems(l).forEach(i=>i.detail&&S.openDet.add(i.id));break;
+    case"edit":S.edit=!S.edit;S.editing=null;break;
+    case"sec":{const id=b.dataset.sec;S.collapsed.has(id)?S.collapsed.delete(id):S.collapsed.add(id);LS.set("dc.collapsed",[...S.collapsed]);break}
+    case"reset":if(S.confirm!=="reset"){S.confirm="reset";break}
+      allItems(l).forEach(i=>{if(isOn(l.id,i.id,S.date))setCheck(l.id,i.id,false)});S.confirm=null;toast("この日のチェックを外しました");break;
+    case"i-edit":{const[s,i]=findItem(b.dataset.item);const it=s.items[i];S.editing=it.id;S.draft={text:it.text,detail:it.detail||"",star:!!it.star};renderMain();const x=$("ed-text");x&&x.focus();return}
+    case"i-cancel":S.editing=null;S.draft=null;break;
+    case"i-save":{const[s,i]=findItem(b.dataset.item);const tx=$("ed-text").value.trim();if(!tx){toast("項目名を入れてください");return}
+      s.items[i]=Object.assign({},s.items[i],{text:tx,detail:$("ed-detail").value.replace(/\s+$/,""),star:$("ed-star").checked});S.editing=null;touchList(l);toast("保存しました");break}
+    case"i-up":case"i-down":{const[s,i]=findItem(b.dataset.item);const j=a==="i-up"?i-1:i+1;if(j<0||j>=s.items.length)return;
+      S.draft={text:$("ed-text").value,detail:$("ed-detail").value,star:$("ed-star").checked};[s.items[i],s.items[j]]=[s.items[j],s.items[i]];touchList(l);renderMain();return}
+    case"i-del":if(S.confirm!=="i"+b.dataset.item){S.confirm="i"+b.dataset.item;renderMain();return}
+      {const[s,i]=findItem(b.dataset.item);s.items.splice(i,1);S.editing=null;S.confirm=null;touchList(l);toast("削除しました")}break;
+    case"s-save":{const s=findSec(b.dataset.sec),inp=[...document.querySelectorAll("[data-sec-title]")].find(x=>x.dataset.secTitle===b.dataset.sec),v=inp?inp.value.trim():"";if(v){s.title=v;touchList(l);toast("保存しました")}break}
+    case"s-up":case"s-down":{const i=l.sections.findIndex(s=>s.id===b.dataset.sec),j=a==="s-up"?i-1:i+1;if(j<0||j>=l.sections.length)return;[l.sections[i],l.sections[j]]=[l.sections[j],l.sections[i]];touchList(l);break}
+    case"s-del":if(S.confirm!=="s"+b.dataset.sec){S.confirm="s"+b.dataset.sec;break}
+      l.sections=l.sections.filter(s=>s.id!==b.dataset.sec);S.confirm=null;touchList(l);toast("セクションを削除しました");break;
+    case"s-add":{const v=$("new-sec").value.trim();if(!v){toast("セクション名を入れてください");return}l.sections.push({id:uid("s"),title:v,items:[]});touchList(l);break}
+    case"l-save":{const v=$("l-title").value.trim();if(!v)return;l.title=v;l.subtitle=$("l-sub").value.trim();l.remind=$("l-time").value||"";touchList(l);toast("保存しました");break}
+    case"l-del":if(S.confirm!=="l"){S.confirm="l";break}
+      D.tombs[l.id]=Date.now();delete D.lists[l.id];persist();schedulePush();pushNative();S.confirm=null;S.edit=false;S.listId=null;toast("リストを削除しました");break;
+    case"syncnow":{const v=$("ghToken").value.trim();if(v&&v!=="（設定済み）"){gh={token:v,gist:"",borrowed:false};LS.set("dc.gh",gh);$("ghToken").value="（設定済み）"}
+      if(!gh.token){toast("トークンを入力してください");return}sync();return}
+    case"syncoff":gh={token:"",gist:"",borrowed:false};LS.set("dc.gh",gh);$("ghToken").value="";setSync("端末に保存");$("syncNote").textContent="同期をやめました。データはこの端末に残っています。";toast("同期をやめました");return;
+    case"bk-save":saveBackup();return;
+    case"bk-apply":applyBackup();return;
+    case"testnotify":if(N)N.testNotify();return;
+    default:return;
+  }
+  render();
+});
+document.addEventListener("input",e=>{
+  if(e.target.id==="memo"){const l=cur();if(!l)return;setMemo(l.id,e.target.value);$("memonote").textContent="保存しました"}
+  if(S.editing&&S.draft){if(e.target.id==="ed-text")S.draft.text=e.target.value;if(e.target.id==="ed-detail")S.draft.detail=e.target.value}
+});
+document.addEventListener("submit",e=>{
+  e.preventDefault();
+  if(e.target.id==="addform"){const l=cur(),s=l&&l.sections.find(x=>x.id===$("add-sec").value),tx=$("add-text").value.trim();
+    if(!s){toast("先にセクションを作ってください");return}if(!tx)return;
+    s.items.push({id:uid("i"),text:tx,detail:$("add-detail").value.replace(/\s+$/,""),star:$("add-star").checked});
+    touchList(l);$("add-text").value="";$("add-detail").value="";$("add-star").checked=false;S.collapsed.delete(s.id);toast("「"+tx.slice(0,16)+"」を追加しました");render()}
+  if(e.target.id==="newlist"){const tx=$("nl-title").value.trim();if(!tx)return;
+    const l={id:uid("l"),title:tx,subtitle:$("nl-sub").value.trim(),remind:$("nl-time").value||"",order:Date.now(),updated:0,sections:[{id:uid("s"),title:"チェック",items:[]}]};
+    S.listId=l.id;LS.set("dc.list",l.id);S.addingList=false;touchList(l);render()}
+});
+
+/* ---------- backup ---------- */
+let pending=null;
+function saveBackup(){
+  const name="daily-check-"+todayStr()+".json",txt=JSON.stringify({app:"daily-check",v:1,exportedAt:new Date().toISOString(),lists:D.lists,days:D.days,tombs:D.tombs},null,1);
+  if(N&&N.saveDownload){toast(N.saveDownload(name,txt)?"ダウンロードに保存しました":"保存できませんでした");return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast("書き出しました");
+}
+function readBackup(el){
+  const f=el.files&&el.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||d.app!=="daily-check"||typeof d.lists!=="object")throw 0;
+      pending=d;$("bk-apply").hidden=false;$("bk-note").textContent=`リスト${Object.keys(d.lists).length}件・記録${Object.keys(d.days||{}).length}日分。「読み込みを実行」で統合します。`}
+    catch(_){pending=null;$("bk-apply").hidden=true;toast("このアプリのバックアップファイルではありません")}
+    el.value=""};r.readAsText(f);
+}
+function applyBackup(){if(!pending)return;mergeData(pending);pending=null;$("bk-apply").hidden=true;$("bk-note").textContent="読み込みました";schedulePush();pushNative();render()}
+
+/* ---------- lifecycle ---------- */
+let lastToday=todayStr();
+function rollover(){const t=todayStr();if(t!==lastToday){if(S.date===lastToday)S.date=t;lastToday=t;render();pushNative()}}
+setInterval(rollover,60000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){rollover();sync()}});
+window.addEventListener("online",()=>sync());
+window.addEventListener("storage",e=>{if(e.key==="dc.data"&&e.newValue){try{D=JSON.parse(e.newValue);render()}catch(_){}}});
+$("ghToken").value=gh.token?"（設定済み）":"";
+$("ghToken").addEventListener("focus",e=>{if(e.target.value==="（設定済み）")e.target.value=""});
+$("ver").textContent="v"+VER+(N?"（アプリ版）":"");
+$("nativebox").hidden=!N;
+if(gh.token){setSync("同期待ち");setTimeout(sync,300)}
+render();pushNative();
+if("serviceWorker" in navigator&&location.protocol==="https:"){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
+window.__dcTest={get D(){return D},sync,mergeData,setCheck,S};
+})();
+</script>
+</body>
+</html>
