@@ -1,0 +1,17 @@
+name: keep-signing-key
+# アプリの署名鍵（キャッシュ）が7日で消えないよう、週2回読み出して保持する
+on:
+  schedule:
+    - cron: "17 3 * * 1,4"
+  workflow_dispatch:
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch signing key cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.dc-signing
+          key: dc-signing-v1
+          lookup-only: false
+      - run: ls -la ~/.dc-signing || echo "key cache not found"
