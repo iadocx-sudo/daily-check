@@ -1,0 +1,48 @@
+name: build-apk
+on:
+  push:
+    paths: ["android.tar.gz", "index.html", "sw.js", "manifest.json", ".github/workflows/build.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack Android project and bundle offline copy
+        run: |
+          tar -xzf android.tar.gz
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          cp icon-192.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          mkdir -p android/app/src/main/assets
+          cp index.html manifest.json sw.js icon-192.png icon-512.png android/app/src/main/assets/
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Restore signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.dc-signing
+          key: dc-signing-v1
+      - name: Create signing key if missing
+        run: |
+          mkdir -p ~/.dc-signing
+          if [ ! -f ~/.dc-signing/debug.keystore ]; then
+            keytool -genkeypair -v -keystore ~/.dc-signing/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          echo "KEYSTORE_PATH=$HOME/.dc-signing/debug.keystore" >> $GITHUB_ENV
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk daily-check.apk
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest daily-check.apk --title "毎日チェック Android版 (build ${{ github.run_number }})" --notes "daily-check.apk をダウンロードしてインストールしてください。"
