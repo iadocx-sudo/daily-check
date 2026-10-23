@@ -110,7 +110,38 @@ textarea.in{min-height:90px;resize:vertical}
 .note{font-size:.75rem;color:var(--muted);margin-top:4px}
 .empty{margin-top:40px;padding:24px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center}
 .foot{margin:36px 0 40px;font-size:.72rem;color:var(--muted);text-align:center}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.85rem;z-index:20;max-width:calc(100% - 32px)}
+body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+.bbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--surface);border-top:1px solid var(--line);padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bbar .in2{max-width:640px;margin:0 auto;display:flex;gap:8px}
+.bbtn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-weight:700;font-size:.9rem}
+.bbtn.back{background:var(--accent);border-color:var(--accent);color:var(--onacc)}
+.calhead{display:flex;align-items:center;gap:8px;margin-top:16px}
+.calhead h1{flex:1;margin:0;font-size:1.3rem;text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:12px}
+.cal .wd{text-align:center;font-size:.75rem;font-weight:700;color:var(--muted);padding-block:4px}
+.cal .wd.sun,.cal .sun .dn,.cal .hol .dn{color:var(--danger)}
+.cal .wd.sat,.cal .sat .dn{color:var(--accent)}
+.cell{min-height:64px;border-radius:8px;background:var(--surface);border:1px solid var(--line);padding:4px;text-align:left;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.cell.out{visibility:hidden}
+.cell.today{border:2px solid var(--accent)}
+.cell:disabled{opacity:.55;cursor:default}
+.cell .dn{font-family:var(--f-num);font-size:.85rem;font-weight:700}
+.cell .hn{font-size:.6rem;line-height:1.2;color:var(--danger);word-break:break-all}
+.cell .ok{margin-top:auto;align-self:center;width:24px;height:24px;border-radius:50%;background:var(--done);display:grid;place-items:center}
+.cell .ok::after{content:"";width:5px;height:10px;border:solid var(--surface);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.calsum{margin-top:10px;font-size:.82rem;color:var(--muted)}
+.ttab{width:100%;border-collapse:collapse;margin-top:14px;font-size:.88rem}
+.ttab th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line);padding:6px 4px}
+.ttab td{border-bottom:1px dashed var(--line);padding:9px 4px;vertical-align:top;overflow-wrap:anywhere}
+.ttab td.no{width:2em;font-family:var(--f-num);color:var(--accent)}
+.ttab td.st{width:5.5em;font-size:.78rem;color:var(--muted);white-space:nowrap}
+.ttab tr.trow{cursor:pointer}
+.ttab tr.pin td{color:var(--star);font-weight:700}
+.tin{display:flex;gap:8px;align-items:flex-end;margin-top:16px}
+.tin textarea{flex:1;min-width:0;min-height:52px;resize:vertical;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tres{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--accent-soft);font-size:.85rem;display:flex;gap:8px;align-items:flex-start}
+.tres div{flex:1;min-width:0;white-space:pre-wrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.85rem;z-index:20;max-width:calc(100% - 32px)}
 </style>
 </head>
 <body>
@@ -123,11 +154,13 @@ textarea.in{min-height:90px;resize:vertical}
     <button class="navbtn" id="next" data-act="next" aria-label="次の日">›</button>
   </div>
   <div class="tabs" id="tabs"></div>
-  <div class="prog"><div class="bar"><i id="barfill" style="width:0"></i></div><div class="pct num" id="pct">0 / 0</div></div>
+  <div class="prog" id="progrow"><div class="bar"><i id="barfill" style="width:0"></i></div><div class="pct num" id="pct">0 / 0</div></div>
 </div></div>
 
 <div class="wrap">
   <div id="main"></div>
+  <div id="calview" hidden></div>
+  <div id="todoview" hidden></div>
 
   <div class="block" id="memoblock">
     <h3>今日のメモ</h3>
@@ -168,6 +201,10 @@ textarea.in{min-height:90px;resize:vertical}
   </div>
   <div class="foot">毎日チェック <span id="ver"></span></div>
 </div>
+<div class="bbar"><div class="in2">
+  <button class="bbtn" id="b-cal" data-act="mode-cal">📅 カレンダー</button>
+  <button class="bbtn" id="b-todo" data-act="mode-todo">📝 TODO</button>
+</div></div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -175,7 +212,7 @@ const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜
 
 (function(){
 "use strict";
-const VER="1.0.0", GOAL=0.8;
+const VER="1.1.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -195,8 +232,11 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 let D=LS.get("dc.data",null);
 if(!D||!D.lists){D={lists:{},days:{},tombs:{}};D.lists[SEED.id]=clone(SEED)}
 D.days=D.days||{};D.tombs=D.tombs||{};
+const TSEED=[["免許証更新","更新期限・手続き方法を確認","2026-09-29"],["健康診断","予約・受診日を確定","2026-10-18"],["イヤホンの線","対応内容・期限を確定","2026-10-20"],["まつ毛美容液","購入・確認","2026-10-24"],["催眠術を受けに行く","予約先・日程を確定","2026-10-24"],["余裕の目安金額の再計算","前提（支出・目標・期間）を確定して試算","2026-10-23"],["今のボトムに残り全額を投入するシミュレーション","投入額・時期・シナリオを確定して試算","2026-10-23"],["法人の赤字を給与所得から税引きできないか確認","税理士・制度で可否を確認","2026-10-24"]];
+if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id])D.todos[id]={id,text:t[0],next:t[1],added:t[2],status:"",order:i+1,updated:1}})}
+D.settings=D.settings||{};
 const S={listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
-  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),confirm:null,addingList:false};
+  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tUndo:null,tMsg:"",tBusy:false};
 
 function persist(){LS.set("dc.data",D)}
 const listsArr=()=>Object.values(D.lists).sort((a,b)=>(a.order||0)-(b.order||0)||(a.title<b.title?-1:1));
@@ -224,7 +264,11 @@ function mergeData(R){
     for(const lid in (b.c||{})){const ac=a.c[lid]=a.c[lid]||{};for(const iid in b.c[lid]){const v=b.c[lid][iid];if(Array.isArray(v)&&(!ac[iid]||v[1]>ac[iid][1]))ac[iid]=v}}
     for(const lid in (b.m||{})){const v=b.m[lid];if(Array.isArray(v)&&(!a.m[lid]||v[1]>a.m[lid][1]))a.m[lid]=v}}
   const keep=addDays(todayStr(),-500);for(const d in days)if(d<keep)delete days[d];
-  D={lists:L,days,tombs:T};persist();
+  const TD={};for(const t of [...Object.values(R.todos||{}),...Object.values(D.todos||{})]){
+    if(!t||!t.id||typeof t.text!=="string")continue;const o=TD[t.id];if(!o||(+t.updated||0)>(+o.updated||0))TD[t.id]=t}
+  for(const k in TD)if((T[k]||0)>=(+TD[k].updated||0))delete TD[k];
+  const ST=Object.assign({},R.settings||{});for(const k in (D.settings||{})){const a=D.settings[k],b=ST[k];if(!b||(+a.updated||0)>(+b.updated||0))ST[k]=a}
+  D={lists:L,days,tombs:T,todos:TD,settings:ST};persist();
 }
 function stable(o){if(Array.isArray(o))return "["+o.map(stable).join(",")+"]";if(o&&typeof o==="object")return "{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+stable(o[k])).join(",")+"}";return JSON.stringify(o)}
 
@@ -255,7 +299,7 @@ async function sync(){
     const g=await findGist();let before="";
     if(g){const f=g.files[GFILE];let txt=f.content;if(f.truncated)txt=await (await fetch(f.raw_url,{cache:"no-store"})).text();
       before=txt;try{mergeData(JSON.parse(txt))}catch(_){}}
-    const out=stable({app:"daily-check",v:1,lists:D.lists,days:D.days,tombs:D.tombs});
+    const out=stable({app:"daily-check",v:1,lists:D.lists,days:D.days,tombs:D.tombs,todos:D.todos,settings:D.settings});
     if(out!==before){
       if(g)await ghFetch("/gists/"+g.id,{method:"PATCH",body:JSON.stringify({files:{[GFILE]:{content:out}}})});
       else{const ng=await ghFetch("/gists",{method:"POST",body:JSON.stringify({description:GDESC,public:false,files:{[GFILE]:{content:out}}})});gh.gist=ng.id;LS.set("dc.gh",gh)}
@@ -352,7 +396,122 @@ function renderMain(){
   if(S.edit)h+=`<div class="inl" style="margin-top:18px"><input class="in" type="text" id="new-sec" style="flex:1;min-width:0" placeholder="新しいセクション名"><button class="btn pri" data-act="s-add">セクション追加</button></div>`;
   M.innerHTML=h;
 }
-function render(){renderTop();renderSide();if(S.editing)return;renderMain()}
+/* ---------- calendar ---------- */
+const HCACHE={};
+function holidays(y){
+  if(HCACHE[y])return HCACHE[y];const H={},k=(m,d)=>y+"-"+pad(m)+"-"+pad(d);
+  [[1,1,"元日"],[2,11,"建国記念の日"],[2,23,"天皇誕生日"],[4,29,"昭和の日"],[5,3,"憲法記念日"],[5,4,"みどりの日"],[5,5,"こどもの日"],[8,11,"山の日"],[11,3,"文化の日"],[11,23,"勤労感謝の日"]].forEach(a=>H[k(a[0],a[1])]=a[2]);
+  const mon=(m,n)=>{const w=new Date(y,m-1,1).getDay();return 1+((8-w)%7)+7*(n-1)};
+  H[k(1,mon(1,2))]="成人の日";H[k(7,mon(7,3))]="海の日";H[k(9,mon(9,3))]="敬老の日";H[k(10,mon(10,2))]="スポーツの日";
+  H[k(3,Math.floor(20.8431+0.242194*(y-1980)-Math.floor((y-1980)/4)))]="春分の日";
+  H[k(9,Math.floor(23.2488+0.242194*(y-1980)-Math.floor((y-1980)/4)))]="秋分の日";
+  for(let d=k(1,2);d<k(12,31);d=addDays(d,1)){if(!H[d]&&H[addDays(d,-1)]&&H[addDays(d,1)]&&new Date(d+"T12:00:00").getDay()!==0)H[d]="国民の休日"}
+  Object.keys(H).sort().forEach(d=>{if(new Date(d+"T12:00:00").getDay()===0){let n=addDays(d,1);while(H[n])n=addDays(n,1);H[n]="振替休日"}});
+  return HCACHE[y]=H;
+}
+function renderCal(){
+  const l=cur(),t=todayStr();if(!S.calYM)S.calYM=S.date.slice(0,7);
+  const [y,m]=S.calYM.split("-").map(Number),H=holidays(y),first=new Date(y,m-1,1),days=new Date(y,m,0).getDate(),w0=first.getDay();
+  let h=`<div class="calhead"><button class="navbtn" data-act="cal-prev" aria-label="前の月">‹</button><h1>${y}年${m}月</h1><button class="navbtn" data-act="cal-next" aria-label="次の月">›</button></div>`;
+  h+=`<div class="cal">`+["日","月","火","水","木","金","土"].map((x,i)=>`<div class="wd ${i===0?"sun":i===6?"sat":""}">${x}</div>`).join("");
+  for(let i=0;i<w0;i++)h+=`<div class="cell out"></div>`;
+  let okN=0;
+  for(let d=1;d<=days;d++){const ds=y+"-"+pad(m)+"-"+pad(d),wd=(w0+d-1)%7,hn=H[ds],ok=l&&ds<=t&&ratio(l,ds)>=GOAL;if(ok)okN++;
+    h+=`<button class="cell ${wd===0?"sun":wd===6?"sat":""} ${hn?"hol":""} ${ds===t?"today":""}" data-act="cal-day" data-date="${ds}" ${ds>t?"disabled":""} aria-label="${ds}${hn?" "+hn:""}${ok?" 達成":""}"><span class="dn">${d}</span>${hn?`<span class="hn">${esc(hn)}</span>`:""}${ok?'<span class="ok"></span>':""}</button>`}
+  h+=`</div><div class="calsum">${l?esc(l.title)+"："+okN+"日達成（80%以上）。日付を押すとその日のチェックを開きます。":""}</div>`;
+  $("calview").innerHTML=h;
+}
+
+/* ---------- TODO (Gemini) ---------- */
+const todoArr=()=>Object.values(D.todos||{}).sort((a,b)=>(a.order||0)-(b.order||0));
+const daysSince=s=>Math.max(0,Math.round((new Date(todayStr()+"T12:00:00")-new Date(s+"T12:00:00"))/864e5));
+function renderTodo(){
+  const arr=todoArr(),key=(D.settings.gemini||{}).key||"";
+  let h=`<table class="ttab"><thead><tr><th>No</th><th>TODO</th><th>次の一手</th><th>状態</th></tr></thead><tbody>`;
+  arr.forEach((t,i)=>{h+=`<tr class="trow" data-act="t-open" data-id="${esc(t.id)}"><td class="no">${i+1}</td><td>${esc(t.text)}</td><td>${esc(t.next||"―")}</td><td class="st">${esc(t.status||daysSince(t.added)+"日経過")}</td></tr>`;
+    if(S.tOpen===t.id)h+=`<tr><td colspan="4"><div class="form" style="margin:0"><label>TODO<input class="in" id="te-text" value="${esc(t.text)}"></label><label>次の一手<input class="in" id="te-next" value="${esc(t.next||"")}"></label><label>状態（空欄なら〇日経過）<input class="in" id="te-st" value="${esc(t.status||"")}"></label>
+      <div class="inl"><button class="btn" data-act="t-up" data-id="${esc(t.id)}" ${i===0?"disabled":""}>↑</button><button class="btn" data-act="t-down" data-id="${esc(t.id)}" ${i===arr.length-1?"disabled":""}>↓</button><span class="spacer"></span><button class="btn del" data-act="t-done" data-id="${esc(t.id)}">完了（消す）</button><button class="btn pri" data-act="t-save" data-id="${esc(t.id)}">保存</button></div></div></td></tr>`});
+  h+=`<tr class="pin"><td class="no">★</td><td>神様の奇跡 3000万円達成</td><td>―</td><td class="st">継続中</td></tr></tbody></table>`;
+  h+=`<div class="tin"><textarea id="t-input" placeholder="例：追記 歯医者の予約　／　3完了　（マイクで話してOK）"></textarea><button class="btn pri" data-act="t-send" ${S.tBusy?"disabled":""}>${S.tBusy?"処理中…":"送信"}</button></div>`;
+  if(S.tMsg)h+=`<div class="tres"><div>${esc(S.tMsg)}</div>${S.tUndo?'<button class="btn" data-act="t-undo">元に戻す</button>':""}</div>`;
+  h+=`<details style="margin:18px 0 0"><summary>AIの設定（Gemini）</summary><div class="form"><label>Gemini APIキー${key?"（設定済み）":""}<input class="in" id="g-key" autocomplete="off" spellcheck="false" placeholder="AIza…" value=""></label>
+    <div class="inl"><button class="btn pri" data-act="g-save">保存</button>${key?'<button class="btn" data-act="g-clear">キーを消す</button>':""}</div>
+    <div class="note">キーは aistudio.google.com/apikey で作れます。同期しているPC・スマホすべてで使えます。未設定でも「3完了」「追記 ○○」の形なら反映します。</div></div></details>`;
+  const keepVal=$("t-input")?$("t-input").value:"";$("todoview").innerHTML=h;$("t-input").value=keepVal;
+}
+function touchTodos(){persist();schedulePush()}
+function applyOps(ops){
+  const arr=todoArr(),before=JSON.stringify(D.todos),now=Date.now(),log=[];let maxO=arr.reduce((m,t)=>Math.max(m,t.order||0),0);
+  for(const o of ops||[]){
+    const t=o.no?arr[o.no-1]:null;
+    if(o.op==="add"&&o.text){const id=uid("t");D.todos[id]={id,text:String(o.text).trim().slice(0,60),next:String(o.next||"").trim().slice(0,60),added:todayStr(),status:"",order:++maxO,updated:now};log.push("追加："+D.todos[id].text)}
+    else if((o.op==="done"||o.op==="delete")&&t&&D.todos[t.id]){D.tombs[t.id]=now;delete D.todos[t.id];log.push("完了："+t.text)}
+    else if(o.op==="edit"&&t&&D.todos[t.id]){const x=D.todos[t.id];if(o.text)x.text=String(o.text).trim().slice(0,60);if(o.next!=null&&o.next!=="")x.next=String(o.next).trim().slice(0,60);x.updated=now;log.push("変更："+x.text)}
+  }
+  if(log.length){S.tUndo=before;touchTodos()}
+  return log;
+}
+function ruleOps(text){
+  const ops=[];
+  text.split(/\n|。/).map(s=>s.trim()).filter(Boolean).forEach(s=>{
+    const nums=[...s.matchAll(/(\d+)\s*(?:番)?\s*(?:は|も|、|,)?\s*(?:完了|済|終わ|おわ|削除|消|いらない|不要)/g)].map(m=>+m[1]);
+    const multi=s.match(/^([\d\s、,と・]+)(?:番)?\s*(?:は|も)?\s*(?:完了|済|終わ|削除|消)/);
+    if(multi)multi[1].split(/[\s、,と・]+/).filter(Boolean).forEach(n=>ops.push({op:"done",no:+n}));
+    else if(nums.length)nums.forEach(n=>ops.push({op:"done",no:n}));
+    else{const a=s.replace(/^(?:追記|追加|ついき)\s*[:：、]?\s*/,"").replace(/(?:を)?(?:追記|追加)(?:して|しといて|お願い)?[。]?$/,"").trim();if(a)ops.push({op:"add",text:a.slice(0,40),next:""})}
+  });
+  ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
+}
+async function geminiOps(text){
+  const g=D.settings.gemini||{};if(!g.key)throw new Error("nokey");
+  const list=todoArr().map((t,i)=>({no:i+1,todo:t.text,next:t.next||""}));
+  const sys=`あなたは個人用TODO表の編集係。ユーザー発言（音声入力の書き起こし。言い淀み・誤変換・話し言葉を含む）を解釈し、表への操作だけを返す。
+規則:
+- 質問・助言・確認・感想は一切返さない。必ず操作を返す。
+- やること・用事・確認したいことの言及は add。text は名詞止めの端的なTODO（全角25字以内、要点のみ）。next は最初の具体的行動（全角20字以内、動詞で終える）。
+- 「N完了」「N済み」「N終わった」「Nいらない」「N消して」などは done（no=番号）。番号がなくても内容で該当が明確ならその番号で done。
+- 既存項目の言い換え・次の一手の変更指示は edit（no と変える項目だけ）。
+- 1回の発言に複数の操作があれば全部返す。
+- どれにも当てはまらない場合は、発言全体を1件の add として要約する。
+- ★の行（神様の奇跡 3000万円達成）は操作しない。`;
+  const body={systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:"今日: "+todayStr()+"\n現在の表: "+JSON.stringify(list)+"\n発言: "+text}]}],
+    generationConfig:{temperature:0.2,responseMimeType:"application/json",responseSchema:{type:"OBJECT",properties:{ops:{type:"ARRAY",items:{type:"OBJECT",properties:{op:{type:"STRING",enum:["add","done","edit"]},no:{type:"INTEGER"},text:{type:"STRING"},next:{type:"STRING"}},required:["op"]}}},required:["ops"]}}};
+  const models=[LS.get("dc.gmodel",""),"gemini-2.5-flash","gemini-flash-latest","gemini-2.0-flash"].filter((x,i,a)=>x&&a.indexOf(x)===i);
+  let last="";
+  for(const m of models){
+    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body)});
+    if(r.status===404){last="モデルが見つかりません";continue}
+    if(r.status===400||r.status===403){const j=await r.json().catch(()=>({}));throw new Error((j.error&&j.error.message||"").includes("API key")?"APIキーが無効です":"Geminiエラー "+r.status)}
+    if(r.status===429)throw new Error("Geminiの無料枠の上限です。少し待ってください");
+    if(!r.ok)throw new Error("Geminiエラー "+r.status);
+    const j=await r.json();LS.set("dc.gmodel",m);
+    const txt=(((j.candidates||[])[0]||{}).content||{}).parts?.map(p=>p.text||"").join("")||"{}";
+    const ops=(JSON.parse(txt).ops||[]);ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
+  }
+  throw new Error(last||"Geminiに接続できません");
+}
+async function sendTodo(){
+  const el=$("t-input"),text=el.value.trim();if(!text||S.tBusy)return;
+  S.tBusy=true;S.tMsg="";renderTodo();let ops,note="";
+  try{ops=await geminiOps(text)}catch(e){ops=ruleOps(text);note=e.message==="nokey"?"":"（AIを使えなかったため簡易反映："+e.message+"）"}
+  const log=applyOps(ops);S.tBusy=false;
+  if(log.length){$("t-input").value="";S.tMsg=log.join("\n")+(note?"\n"+note:"")}else{S.tUndo=null;S.tMsg="反映できる操作がありませんでした"+(note?"\n"+note:"")}
+  renderTodo();
+}
+
+function renderMode(){
+  const m=S.mode;
+  ["main","memoblock","addblock","settings"].forEach(id=>{if(m!=="check")$(id).hidden=true});
+  if(m==="check"){$("main").hidden=false;$("settings").hidden=false}
+  $("calview").hidden=m!=="cal";$("todoview").hidden=m!=="todo";
+  $("tabs").hidden=m==="todo";$("progrow").hidden=m!=="check";
+  $("b-cal").textContent=m==="cal"?"✓ チェックに戻る":"📅 カレンダー";$("b-cal").classList.toggle("back",m==="cal");
+  $("b-todo").textContent=m==="todo"?"✓ チェックに戻る":"📝 TODO";$("b-todo").classList.toggle("back",m==="todo");
+}
+function render(){renderTop();
+  if(S.mode==="cal"){renderMode();renderCal();return}
+  if(S.mode==="todo"){renderMode();if(!S.tBusy&&document.activeElement&&!/^(te-|g-key)/.test(document.activeElement.id||""))renderTodo();return}
+  renderSide();renderMode();if(S.editing)return;renderMain()}
 
 /* ---------- events ---------- */
 document.addEventListener("change",e=>{
@@ -361,6 +520,7 @@ document.addEventListener("change",e=>{
     if(S.onlyOpen)setTimeout(()=>{if(!S.editing)renderMain()},350);else renderMain();return}
   if(el.id==="bk-file")readBackup(el);
 });
+document.addEventListener("keydown",e=>{if(e.target.id==="t-input"&&e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendTodo()}});
 document.addEventListener("toggle",e=>{const id=e.target.dataset&&e.target.dataset.det;if(!id)return;e.target.open?S.openDet.add(id):S.openDet.delete(id)},true);
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");if(!b||b.dataset.act==="check")return;
@@ -405,6 +565,23 @@ document.addEventListener("click",e=>{
     case"bk-save":saveBackup();return;
     case"bk-apply":applyBackup();return;
     case"testnotify":if(N)N.testNotify();return;
+    case"mode-cal":S.mode=S.mode==="cal"?"check":"cal";S.calYM=S.date.slice(0,7);S.editing=null;scrollTo(0,0);break;
+    case"mode-todo":S.mode=S.mode==="todo"?"check":"todo";S.editing=null;S.tOpen=null;scrollTo(0,0);break;
+    case"cal-prev":case"cal-next":{const[y,m]=S.calYM.split("-").map(Number),d=new Date(y,m-1+(a==="cal-next"?1:-1),1);S.calYM=d.getFullYear()+"-"+pad(d.getMonth()+1);break}
+    case"cal-day":S.date=b.dataset.date;S.mode="check";scrollTo(0,0);break;
+    case"t-open":S.tOpen=S.tOpen===b.dataset.id?null:b.dataset.id;renderTodo();return;
+    case"t-save":{const x=D.todos[b.dataset.id];if(!x)return;const tx=$("te-text").value.trim();if(!tx){toast("TODOを入れてください");return}
+      x.text=tx;x.next=$("te-next").value.trim();x.status=$("te-st").value.trim();x.updated=Date.now();S.tOpen=null;touchTodos();toast("保存しました");renderTodo();return}
+    case"t-done":{const x=D.todos[b.dataset.id];if(!x)return;S.tUndo=JSON.stringify(D.todos);D.tombs[x.id]=Date.now();delete D.todos[x.id];S.tOpen=null;S.tMsg="完了："+x.text;touchTodos();renderTodo();return}
+    case"t-up":case"t-down":{const arr=todoArr(),i=arr.findIndex(t=>t.id===b.dataset.id),j=a==="t-up"?i-1:i+1;if(j<0||j>=arr.length)return;
+      const now=Date.now(),oi=arr[i].order,oj=arr[j].order;arr[i].order=oj;arr[j].order=oi;if(oi===oj){arr[i].order=j;arr[j].order=i}arr[i].updated=now;arr[j].updated=now;touchTodos();renderTodo();return}
+    case"t-send":sendTodo();return;
+    case"t-undo":{if(!S.tUndo)return;const prev=JSON.parse(S.tUndo),now=Date.now();
+      for(const id in D.todos)if(!prev[id]){D.tombs[id]=now;delete D.todos[id]}
+      for(const id in prev){D.todos[id]=Object.assign({},prev[id],{updated:now});delete D.tombs[id]}
+      S.tUndo=null;S.tMsg="元に戻しました";touchTodos();renderTodo();return}
+    case"g-save":{const v=$("g-key").value.trim();if(!v){toast("キーを入力してください");return}D.settings.gemini={key:v,updated:Date.now()};LS.set("dc.gmodel","");touchTodos();toast("キーを保存しました");renderTodo();return}
+    case"g-clear":D.settings.gemini={key:"",updated:Date.now()};touchTodos();toast("キーを消しました");renderTodo();return;
     default:return;
   }
   render();
@@ -427,7 +604,7 @@ document.addEventListener("submit",e=>{
 /* ---------- backup ---------- */
 let pending=null;
 function saveBackup(){
-  const name="daily-check-"+todayStr()+".json",txt=JSON.stringify({app:"daily-check",v:1,exportedAt:new Date().toISOString(),lists:D.lists,days:D.days,tombs:D.tombs},null,1);
+  const name="daily-check-"+todayStr()+".json",txt=JSON.stringify({app:"daily-check",v:1,exportedAt:new Date().toISOString(),lists:D.lists,days:D.days,tombs:D.tombs,todos:D.todos},null,1);
   if(N&&N.saveDownload){toast(N.saveDownload(name,txt)?"ダウンロードに保存しました":"保存できませんでした");return}
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast("書き出しました");
