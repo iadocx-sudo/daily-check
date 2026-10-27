@@ -212,7 +212,7 @@ const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜
 
 (function(){
 "use strict";
-const VER="1.1.0", GOAL=0.8;
+const VER="1.1.1", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -454,10 +454,10 @@ function applyOps(ops){
 function ruleOps(text){
   const ops=[];
   text.split(/\n|。/).map(s=>s.trim()).filter(Boolean).forEach(s=>{
-    const nums=[...s.matchAll(/(\d+)\s*(?:番)?\s*(?:は|も|、|,)?\s*(?:完了|済|終わ|おわ|削除|消|いらない|不要)/g)].map(m=>+m[1]);
-    const multi=s.match(/^([\d\s、,と・]+)(?:番)?\s*(?:は|も)?\s*(?:完了|済|終わ|削除|消)/);
-    if(multi)multi[1].split(/[\s、,と・]+/).filter(Boolean).forEach(n=>ops.push({op:"done",no:+n}));
-    else if(nums.length)nums.forEach(n=>ops.push({op:"done",no:n}));
+    const z=s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248));
+    const isDone=/(完了|済|終わ|おわ|削除|消して|消す|いらない|不要|クローズ)/.test(z)&&!/(追記|追加)/.test(z);
+    const nums=[...z.matchAll(/(\d+)/g)].map(m=>+m[1]);
+    if(isDone&&nums.length)[...new Set(nums)].forEach(n=>ops.push({op:"done",no:n}));
     else{const a=s.replace(/^(?:追記|追加|ついき)\s*[:：、]?\s*/,"").replace(/(?:を)?(?:追記|追加)(?:して|しといて|お願い)?[。]?$/,"").trim();if(a)ops.push({op:"add",text:a.slice(0,40),next:""})}
   });
   ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
@@ -476,14 +476,17 @@ async function geminiOps(text){
 - ★の行（神様の奇跡 3000万円達成）は操作しない。`;
   const body={systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:"今日: "+todayStr()+"\n現在の表: "+JSON.stringify(list)+"\n発言: "+text}]}],
     generationConfig:{temperature:0.2,responseMimeType:"application/json",responseSchema:{type:"OBJECT",properties:{ops:{type:"ARRAY",items:{type:"OBJECT",properties:{op:{type:"STRING",enum:["add","done","edit"]},no:{type:"INTEGER"},text:{type:"STRING"},next:{type:"STRING"}},required:["op"]}}},required:["ops"]}}};
-  const models=[LS.get("dc.gmodel",""),"gemini-2.5-flash","gemini-flash-latest","gemini-2.0-flash"].filter((x,i,a)=>x&&a.indexOf(x)===i);
-  let last="";
+  const models=[LS.get("dc.gmodel",""),"gemini-3.5-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-flash-lite-latest","gemini-flash-latest"].filter((x,i,a)=>x&&a.indexOf(x)===i);
+  let last="",t0=Date.now();
   for(const m of models){
-    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body)});
-    if(r.status===404){last="モデルが見つかりません";continue}
-    if(r.status===400||r.status===403){const j=await r.json().catch(()=>({}));throw new Error((j.error&&j.error.message||"").includes("API key")?"APIキーが無効です":"Geminiエラー "+r.status)}
-    if(r.status===429)throw new Error("Geminiの無料枠の上限です。少し待ってください");
-    if(!r.ok)throw new Error("Geminiエラー "+r.status);
+    if(Date.now()-t0>45000)break;
+    let r;const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);
+    try{r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent",{method:"POST",signal:ac.signal,headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body)})}
+    catch(e){clearTimeout(tm);last=e.name==="AbortError"?"Geminiの応答が遅すぎます":"通信エラー";continue}
+    clearTimeout(tm);
+    if(r.status===404||r.status===429||r.status>=500){last=r.status===429?"Geminiの無料枠の上限です":"Geminiエラー "+r.status;if(LS.get("dc.gmodel","")===m)LS.set("dc.gmodel","");continue}
+    if(r.status===400||r.status===401||r.status===403){const j=await r.json().catch(()=>({}));const msg=(j.error&&j.error.message)||"";if(/API key|API_KEY|credential|permission/i.test(msg))throw new Error("APIキーが無効です");last="Geminiエラー "+r.status;continue}
+    if(!r.ok){last="Geminiエラー "+r.status;continue}
     const j=await r.json();LS.set("dc.gmodel",m);
     const txt=(((j.candidates||[])[0]||{}).content||{}).parts?.map(p=>p.text||"").join("")||"{}";
     const ops=(JSON.parse(txt).ops||[]);ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
@@ -493,10 +496,12 @@ async function geminiOps(text){
 async function sendTodo(){
   const el=$("t-input"),text=el.value.trim();if(!text||S.tBusy)return;
   S.tBusy=true;S.tMsg="";renderTodo();let ops,note="";
-  try{ops=await geminiOps(text)}catch(e){ops=ruleOps(text);note=e.message==="nokey"?"":"（AIを使えなかったため簡易反映："+e.message+"）"}
-  const log=applyOps(ops);S.tBusy=false;
-  if(log.length){$("t-input").value="";S.tMsg=log.join("\n")+(note?"\n"+note:"")}else{S.tUndo=null;S.tMsg="反映できる操作がありませんでした"+(note?"\n"+note:"")}
-  renderTodo();
+  try{
+    try{ops=await geminiOps(text)}catch(e){ops=ruleOps(text);note=e.message==="nokey"?"":"（AIを使えなかったため簡易反映："+e.message+"）"}
+    const log=applyOps(ops);
+    if(log.length){$("t-input").value="";S.tMsg=log.join("\n")+(note?"\n"+note:"")}else{S.tUndo=null;S.tMsg="反映できる操作がありませんでした"+(note?"\n"+note:"")}
+  }catch(e){S.tMsg="エラー："+(e.message||e)}
+  finally{S.tBusy=false;renderTodo()}
 }
 
 function renderMode(){
