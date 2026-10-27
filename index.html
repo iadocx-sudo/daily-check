@@ -212,7 +212,7 @@ const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜
 
 (function(){
 "use strict";
-const VER="1.1.1", GOAL=0.8;
+const VER="1.1.2", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -462,21 +462,31 @@ function ruleOps(text){
   });
   ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
 }
+const BADW=/(全角|字以内|名詞止め|TODO名|text|next|例えば|Japanese|とする|だね|よし|か？|\?|。.*。)/i;
+function cleanOp(o,utter){
+  if(!o||!["add","done","edit"].includes(o.op))return null;
+  const fix=(v,max)=>{v=String(v||"").replace(/[\r\n]+/g," ").trim();return(!v||v.length>max||BADW.test(v))?null:v};
+  if(o.op==="add"){let t=fix(o.text,30);if(!t){const u=utter.replace(/^(えー?と?|あのー?|あー|うーん)[、,\s]*/,"").replace(/[。、\s]+$/,"").trim();t=u.length<=30?u:u.slice(0,30)}
+    return {op:"add",text:t,next:fix(o.next,24)||""}}
+  if(o.op==="edit"){const t=fix(o.text,30),n=fix(o.next,24);if(!t&&!n)return null;return {op:"edit",no:o.no,text:t||"",next:n||""}}
+  return {op:"done",no:o.no};
+}
 async function geminiOps(text){
   const g=D.settings.gemini||{};if(!g.key)throw new Error("nokey");
   const list=todoArr().map((t,i)=>({no:i+1,todo:t.text,next:t.next||""}));
-  const sys=`あなたは個人用TODO表の編集係。ユーザー発言（音声入力の書き起こし。言い淀み・誤変換・話し言葉を含む）を解釈し、表への操作だけを返す。
-規則:
-- 質問・助言・確認・感想は一切返さない。必ず操作を返す。
-- やること・用事・確認したいことの言及は add。text は名詞止めの端的なTODO（全角25字以内、要点のみ）。next は最初の具体的行動（全角20字以内、動詞で終える）。
-- 「N完了」「N済み」「N終わった」「Nいらない」「N消して」などは done（no=番号）。番号がなくても内容で該当が明確ならその番号で done。
-- 既存項目の言い換え・次の一手の変更指示は edit（no と変える項目だけ）。
-- 1回の発言に複数の操作があれば全部返す。
-- どれにも当てはまらない場合は、発言全体を1件の add として要約する。
-- ★の行（神様の奇跡 3000万円達成）は操作しない。`;
+  const sys=`あなたは個人用TODO表の編集係。ユーザーの発言（音声入力の書き起こし。言い淀み・誤変換・話し言葉を含む）を、表への操作JSONに変換する。出力はJSONのみ。説明・思考過程・質問・助言は書かない。
+形式: {"ops":[{"op":"add","text":"…","next":"…"},{"op":"done","no":数字},{"op":"edit","no":数字,"text":"…","next":"…"}]}
+- add: 新しいTODO。text=発言の要点を名詞止めで短く（全角25字以内）。短い名詞句ならほぼそのまま使う。期限があれば括弧で添える。next=最初の具体的行動（全角20字以内）。
+- done: 「N完了」「N済み」「N削除」「Nクリア」「N終わった」「Nいらない」など（no=番号）。番号がなくても内容で該当が明確ならその番号。
+- edit: 既存項目の言い換え・次の一手の変更指示。
+- 完了・削除・変更の言葉がない発言は原則 add。1つの発言に複数あれば全部返す。★の行は操作しない。
+例: 発言「猫の予約」→ {"ops":[{"op":"add","text":"猫の予約","next":"予約先と日時を決める"}]}
+例: 発言「えーと明日までに会社の経費精算しなきゃ」→ {"ops":[{"op":"add","text":"経費精算（明日まで）","next":"領収書をまとめて申請"}]}
+例: 発言「3番と5番クリア」→ {"ops":[{"op":"done","no":3},{"op":"done","no":5}]}
+例: 発言「2完了 あとアマゾンの返品」→ {"ops":[{"op":"done","no":2},{"op":"add","text":"Amazonの返品","next":"返品手続きをする"}]}`;
   const body={systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:"今日: "+todayStr()+"\n現在の表: "+JSON.stringify(list)+"\n発言: "+text}]}],
-    generationConfig:{temperature:0.2,responseMimeType:"application/json",responseSchema:{type:"OBJECT",properties:{ops:{type:"ARRAY",items:{type:"OBJECT",properties:{op:{type:"STRING",enum:["add","done","edit"]},no:{type:"INTEGER"},text:{type:"STRING"},next:{type:"STRING"}},required:["op"]}}},required:["ops"]}}};
-  const models=[LS.get("dc.gmodel",""),"gemini-3.5-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-flash-lite-latest","gemini-flash-latest"].filter((x,i,a)=>x&&a.indexOf(x)===i);
+    generationConfig:{temperature:0,responseMimeType:"application/json"}};
+  const models=[LS.get("dc.gmodel3",""),"gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-3.5-flash","gemini-flash-lite-latest","gemini-flash-latest"].filter((x,i,a)=>x&&a.indexOf(x)===i);
   let last="",t0=Date.now();
   for(const m of models){
     if(Date.now()-t0>45000)break;
@@ -484,12 +494,15 @@ async function geminiOps(text){
     try{r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent",{method:"POST",signal:ac.signal,headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body)})}
     catch(e){clearTimeout(tm);last=e.name==="AbortError"?"Geminiの応答が遅すぎます":"通信エラー";continue}
     clearTimeout(tm);
-    if(r.status===404||r.status===429||r.status>=500){last=r.status===429?"Geminiの無料枠の上限です":"Geminiエラー "+r.status;if(LS.get("dc.gmodel","")===m)LS.set("dc.gmodel","");continue}
+    if(r.status===404||r.status===429||r.status>=500){last=r.status===429?"Geminiの無料枠の上限です":"Geminiエラー "+r.status;if(LS.get("dc.gmodel3","")===m)LS.set("dc.gmodel3","");continue}
     if(r.status===400||r.status===401||r.status===403){const j=await r.json().catch(()=>({}));const msg=(j.error&&j.error.message)||"";if(/API key|API_KEY|credential|permission/i.test(msg))throw new Error("APIキーが無効です");last="Geminiエラー "+r.status;continue}
     if(!r.ok){last="Geminiエラー "+r.status;continue}
-    const j=await r.json();LS.set("dc.gmodel",m);
-    const txt=(((j.candidates||[])[0]||{}).content||{}).parts?.map(p=>p.text||"").join("")||"{}";
-    const ops=(JSON.parse(txt).ops||[]);ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
+    const j=await r.json();
+    const txt=((((j.candidates||[])[0]||{}).content||{}).parts||[]).filter(p=>!p.thought).map(p=>p.text||"").join("");
+    let ops;try{const mm=txt.match(/\{[\s\S]*\}/);ops=JSON.parse(mm?mm[0]:txt).ops}catch(e){last="AIの応答を読めません";continue}
+    if(!Array.isArray(ops)){last="AIの応答を読めません";continue}
+    ops=ops.map(o=>cleanOp(o,text)).filter(Boolean);
+    LS.set("dc.gmodel3",m);ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
   }
   throw new Error(last||"Geminiに接続できません");
 }
