@@ -133,7 +133,18 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .ttab{width:100%;border-collapse:collapse;margin-top:14px;font-size:.88rem}
 .ttab th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line);padding:6px 4px}
 .ttab td{border-bottom:1px dashed var(--line);padding:9px 4px;vertical-align:top;overflow-wrap:anywhere}
-.ttab td.no{width:2em;font-family:var(--f-num);color:var(--accent)}
+.ttab td.no{width:2.6em;font-family:var(--f-num);color:var(--accent)}
+.nobox{width:28px;height:28px;border:2px solid var(--accent);border-radius:6px;display:grid;place-items:center;font-family:var(--f-num);font-size:.85rem;font-weight:700;color:var(--accent);background:var(--surface)}
+@media (hover:hover){.nobox:hover{background:var(--done);border-color:var(--done);color:var(--surface)}}
+.nobox:active{background:var(--done);border-color:var(--done);color:var(--surface)}
+.ttab td.due{width:4.2em;white-space:nowrap;font-family:var(--f-num);font-size:.85rem}
+.ttab td.due.over{color:var(--danger);font-weight:700}
+.tbox{position:relative;flex:1;min-width:0;display:flex}
+.tbox textarea{padding-right:48px!important}
+.mic{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--bg);font-size:1.1rem;display:grid;place-items:center}
+.mic.on{background:var(--danger);border-color:var(--danger);color:#fff;animation:pul 1s infinite}
+@keyframes pul{50%{opacity:.6}}
+@media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
 .ttab td.st{width:5.5em;font-size:.78rem;color:var(--muted);white-space:nowrap}
 .ttab tr.trow{cursor:pointer}
 .ttab tr.pin td{color:var(--star);font-weight:700}
@@ -212,7 +223,7 @@ const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜
 
 (function(){
 "use strict";
-const VER="1.1.2", GOAL=0.8;
+const VER="1.2.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -233,10 +244,10 @@ let D=LS.get("dc.data",null);
 if(!D||!D.lists){D={lists:{},days:{},tombs:{}};D.lists[SEED.id]=clone(SEED)}
 D.days=D.days||{};D.tombs=D.tombs||{};
 const TSEED=[["免許証更新","更新期限・手続き方法を確認","2026-09-29"],["健康診断","予約・受診日を確定","2026-10-18"],["イヤホンの線","対応内容・期限を確定","2026-10-20"],["まつ毛美容液","購入・確認","2026-10-24"],["催眠術を受けに行く","予約先・日程を確定","2026-10-24"],["余裕の目安金額の再計算","前提（支出・目標・期間）を確定して試算","2026-10-23"],["今のボトムに残り全額を投入するシミュレーション","投入額・時期・シナリオを確定して試算","2026-10-23"],["法人の赤字を給与所得から税引きできないか確認","税理士・制度で可否を確認","2026-10-24"]];
-if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id])D.todos[id]={id,text:t[0],next:t[1],added:t[2],status:"",order:i+1,updated:1}})}
+if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id])D.todos[id]={id,text:t[0],due:"",added:t[2],status:"",order:i+1,updated:1}})}
 D.settings=D.settings||{};
 const S={listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
-  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tUndo:null,tMsg:"",tBusy:false};
+  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tUndo:null,tMsg:"",tBusy:false};
 
 function persist(){LS.set("dc.data",D)}
 const listsArr=()=>Object.values(D.lists).sort((a,b)=>(a.order||0)-(b.order||0)||(a.title<b.title?-1:1));
@@ -425,14 +436,30 @@ function renderCal(){
 /* ---------- TODO (Gemini) ---------- */
 const todoArr=()=>Object.values(D.todos||{}).sort((a,b)=>(a.order||0)-(b.order||0));
 const daysSince=s=>Math.max(0,Math.round((new Date(todayStr()+"T12:00:00")-new Date(s+"T12:00:00"))/864e5));
+const fmtDue=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||"")?(+d.slice(5,7))+"/"+(+d.slice(8,10)):"/";
+const micOK=()=>!!((N&&N.startVoice)||window.SpeechRecognition||window.webkitSpeechRecognition);
+let rec=null;
+function startMic(){
+  if(S.listening){if(rec)try{rec.stop()}catch(e){}return}
+  if(N&&N.startVoice){N.startVoice();return}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
+  rec=new SR();rec.lang="ja-JP";rec.interimResults=true;rec.continuous=false;
+  const el=$("t-input"),base=el.value?el.value.replace(/\s+$/,"")+" ":"";
+  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;$("t-input").value=base+t};
+  rec.onerror=e=>{if(e.error==="not-allowed")toast("マイクの使用が許可されていません")};
+  rec.onend=()=>{S.listening=false;rec=null;renderTodo();$("t-input").focus()};
+  S.listening=true;renderTodo();try{rec.start()}catch(e){S.listening=false;renderTodo()}
+}
+window.__dcToast=m=>toast(m);
+window.__dcVoice=t=>{if(!t)return;const el=$("t-input");if(!el)return;el.value=(el.value?el.value.replace(/\s+$/,"")+" ":"")+t;el.focus()};
 function renderTodo(){
   const arr=todoArr(),key=(D.settings.gemini||{}).key||"";
-  let h=`<table class="ttab"><thead><tr><th>No</th><th>TODO</th><th>次の一手</th><th>状態</th></tr></thead><tbody>`;
-  arr.forEach((t,i)=>{h+=`<tr class="trow" data-act="t-open" data-id="${esc(t.id)}"><td class="no">${i+1}</td><td>${esc(t.text)}</td><td>${esc(t.next||"―")}</td><td class="st">${esc(t.status||daysSince(t.added)+"日経過")}</td></tr>`;
-    if(S.tOpen===t.id)h+=`<tr><td colspan="4"><div class="form" style="margin:0"><label>TODO<input class="in" id="te-text" value="${esc(t.text)}"></label><label>次の一手<input class="in" id="te-next" value="${esc(t.next||"")}"></label><label>状態（空欄なら〇日経過）<input class="in" id="te-st" value="${esc(t.status||"")}"></label>
+  let h=`<table class="ttab"><thead><tr><th>No</th><th>TODO</th><th>期限</th><th>状態</th></tr></thead><tbody>`;
+  arr.forEach((t,i)=>{h+=`<tr class="trow" data-act="t-open" data-id="${esc(t.id)}"><td class="no"><button class="nobox" data-act="t-done" data-id="${esc(t.id)}" aria-label="${i+1}番を完了にする">${i+1}</button></td><td>${esc(t.text)}</td><td class="due ${t.due&&t.due<todayStr()?"over":""}">${fmtDue(t.due)}</td><td class="st">${esc(t.status||daysSince(t.added)+"日経過")}</td></tr>`;
+    if(S.tOpen===t.id)h+=`<tr><td colspan="4"><div class="form" style="margin:0"><label>TODO<input class="in" id="te-text" value="${esc(t.text)}"></label><label>期限（空欄なら /）<input class="in" type="date" id="te-due" value="${esc(t.due||"")}"></label><label>状態（空欄なら〇日経過）<input class="in" id="te-st" value="${esc(t.status||"")}"></label>
       <div class="inl"><button class="btn" data-act="t-up" data-id="${esc(t.id)}" ${i===0?"disabled":""}>↑</button><button class="btn" data-act="t-down" data-id="${esc(t.id)}" ${i===arr.length-1?"disabled":""}>↓</button><span class="spacer"></span><button class="btn del" data-act="t-done" data-id="${esc(t.id)}">完了（消す）</button><button class="btn pri" data-act="t-save" data-id="${esc(t.id)}">保存</button></div></div></td></tr>`});
-  h+=`<tr class="pin"><td class="no">★</td><td>神様の奇跡 3000万円達成</td><td>―</td><td class="st">継続中</td></tr></tbody></table>`;
-  h+=`<div class="tin"><textarea id="t-input" placeholder="例：追記 歯医者の予約　／　3完了　（マイクで話してOK）"></textarea><button class="btn pri" data-act="t-send" ${S.tBusy?"disabled":""}>${S.tBusy?"処理中…":"送信"}</button></div>`;
+  h+=`<tr class="pin"><td class="no">★</td><td>神様の奇跡 3000万円達成</td><td class="due">/</td><td class="st">継続中</td></tr></tbody></table>`;
+  h+=`<div class="tin"><div class="tbox"><textarea id="t-input" placeholder="例：歯医者の予約 金曜まで　／　3完了"></textarea>${micOK()?`<button class="mic ${S.listening?"on":""}" data-act="t-mic" aria-label="音声入力">🎤</button>`:""}</div><button class="btn pri" data-act="t-send" ${S.tBusy?"disabled":""}>${S.tBusy?"処理中…":"送信"}</button></div>`;
   if(S.tMsg)h+=`<div class="tres"><div>${esc(S.tMsg)}</div>${S.tUndo?'<button class="btn" data-act="t-undo">元に戻す</button>':""}</div>`;
   h+=`<details style="margin:18px 0 0"><summary>AIの設定（Gemini）</summary><div class="form"><label>Gemini APIキー${key?"（設定済み）":""}<input class="in" id="g-key" autocomplete="off" spellcheck="false" placeholder="AIza…" value=""></label>
     <div class="inl"><button class="btn pri" data-act="g-save">保存</button>${key?'<button class="btn" data-act="g-clear">キーを消す</button>':""}</div>
@@ -444,9 +471,9 @@ function applyOps(ops){
   const arr=todoArr(),before=JSON.stringify(D.todos),now=Date.now(),log=[];let maxO=arr.reduce((m,t)=>Math.max(m,t.order||0),0);
   for(const o of ops||[]){
     const t=o.no?arr[o.no-1]:null;
-    if(o.op==="add"&&o.text){const id=uid("t");D.todos[id]={id,text:String(o.text).trim().slice(0,60),next:String(o.next||"").trim().slice(0,60),added:todayStr(),status:"",order:++maxO,updated:now};log.push("追加："+D.todos[id].text)}
+    if(o.op==="add"&&o.text){const id=uid("t");D.todos[id]={id,text:String(o.text).trim().slice(0,60),due:o.due||"",added:todayStr(),status:"",order:++maxO,updated:now};log.push("追加："+D.todos[id].text)}
     else if((o.op==="done"||o.op==="delete")&&t&&D.todos[t.id]){D.tombs[t.id]=now;delete D.todos[t.id];log.push("完了："+t.text)}
-    else if(o.op==="edit"&&t&&D.todos[t.id]){const x=D.todos[t.id];if(o.text)x.text=String(o.text).trim().slice(0,60);if(o.next!=null&&o.next!=="")x.next=String(o.next).trim().slice(0,60);x.updated=now;log.push("変更："+x.text)}
+    else if(o.op==="edit"&&t&&D.todos[t.id]){const x=D.todos[t.id];if(o.text)x.text=String(o.text).trim().slice(0,60);if(o.due)x.due=o.due;x.updated=now;log.push("変更："+x.text)}
   }
   if(log.length){S.tUndo=before;touchTodos()}
   return log;
@@ -458,33 +485,37 @@ function ruleOps(text){
     const isDone=/(完了|済|終わ|おわ|削除|消して|消す|いらない|不要|クローズ)/.test(z)&&!/(追記|追加)/.test(z);
     const nums=[...z.matchAll(/(\d+)/g)].map(m=>+m[1]);
     if(isDone&&nums.length)[...new Set(nums)].forEach(n=>ops.push({op:"done",no:n}));
-    else{const a=s.replace(/^(?:追記|追加|ついき)\s*[:：、]?\s*/,"").replace(/(?:を)?(?:追記|追加)(?:して|しといて|お願い)?[。]?$/,"").trim();if(a)ops.push({op:"add",text:a.slice(0,40),next:""})}
+    else{const a=s.replace(/^(?:追記|追加|ついき)\s*[:：、]?\s*/,"").replace(/(?:を)?(?:追記|追加)(?:して|しといて|お願い)?[。]?$/,"").trim();if(a)ops.push({op:"add",text:a.slice(0,40),due:""})}
   });
   ops.sort((a,b)=>(b.no||0)-(a.no||0));return ops;
 }
 const BADW=/(全角|字以内|名詞止め|TODO名|text|next|例えば|Japanese|とする|だね|よし|か？|\?|。.*。)/i;
+const okDue=d=>/^\d{4}-\d{2}-\d{2}$/.test(String(d||""))?String(d):"";
 function cleanOp(o,utter){
   if(!o||!["add","done","edit"].includes(o.op))return null;
   const fix=(v,max)=>{v=String(v||"").replace(/[\r\n]+/g," ").trim();return(!v||v.length>max||BADW.test(v))?null:v};
   if(o.op==="add"){let t=fix(o.text,30);if(!t){const u=utter.replace(/^(えー?と?|あのー?|あー|うーん)[、,\s]*/,"").replace(/[。、\s]+$/,"").trim();t=u.length<=30?u:u.slice(0,30)}
-    return {op:"add",text:t,next:fix(o.next,24)||""}}
-  if(o.op==="edit"){const t=fix(o.text,30),n=fix(o.next,24);if(!t&&!n)return null;return {op:"edit",no:o.no,text:t||"",next:n||""}}
+    return {op:"add",text:t,due:okDue(o.due)}}
+  if(o.op==="edit"){const t=fix(o.text,30),d=okDue(o.due);if(!t&&!d)return null;return {op:"edit",no:o.no,text:t||"",due:d}}
   return {op:"done",no:o.no};
 }
 async function geminiOps(text){
   const g=D.settings.gemini||{};if(!g.key)throw new Error("nokey");
-  const list=todoArr().map((t,i)=>({no:i+1,todo:t.text,next:t.next||""}));
+  const list=todoArr().map((t,i)=>({no:i+1,todo:t.text,due:t.due||""}));
   const sys=`あなたは個人用TODO表の編集係。ユーザーの発言（音声入力の書き起こし。言い淀み・誤変換・話し言葉を含む）を、表への操作JSONに変換する。出力はJSONのみ。説明・思考過程・質問・助言は書かない。
-形式: {"ops":[{"op":"add","text":"…","next":"…"},{"op":"done","no":数字},{"op":"edit","no":数字,"text":"…","next":"…"}]}
-- add: 新しいTODO。text=発言の要点を名詞止めで短く（全角25字以内）。短い名詞句ならほぼそのまま使う。期限があれば括弧で添える。next=最初の具体的行動（全角20字以内）。
+形式: {"ops":[{"op":"add","text":"…","due":"YYYY-MM-DD または空文字"},{"op":"done","no":数字},{"op":"edit","no":数字,"text":"…","due":"…"}]}
+- add: 新しいTODO。text=発言の要点を名詞止めで短く（全角25字以内）。短い名詞句ならほぼそのまま使う。期限の言葉はtextに入れない。
+- due: 発言に期限・日付（明日、金曜まで、月末、11/5など）がある時だけ、今日の日付から計算した YYYY-MM-DD。無ければ必ず空文字。推測で入れない。
 - done: 「N完了」「N済み」「N削除」「Nクリア」「N終わった」「Nいらない」など（no=番号）。番号がなくても内容で該当が明確ならその番号。
-- edit: 既存項目の言い換え・次の一手の変更指示。
+- edit: 既存項目の言い換え・期限の変更指示。
 - 完了・削除・変更の言葉がない発言は原則 add。1つの発言に複数あれば全部返す。★の行は操作しない。
-例: 発言「猫の予約」→ {"ops":[{"op":"add","text":"猫の予約","next":"予約先と日時を決める"}]}
-例: 発言「えーと明日までに会社の経費精算しなきゃ」→ {"ops":[{"op":"add","text":"経費精算（明日まで）","next":"領収書をまとめて申請"}]}
-例: 発言「3番と5番クリア」→ {"ops":[{"op":"done","no":3},{"op":"done","no":5}]}
-例: 発言「2完了 あとアマゾンの返品」→ {"ops":[{"op":"done","no":2},{"op":"add","text":"Amazonの返品","next":"返品手続きをする"}]}`;
-  const body={systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:"今日: "+todayStr()+"\n現在の表: "+JSON.stringify(list)+"\n発言: "+text}]}],
+例（今日が2026-10-28(水)の場合）:
+発言「猫の予約」→ {"ops":[{"op":"add","text":"猫の予約","due":""}]}
+発言「えーと明日までに会社の経費精算しなきゃ」→ {"ops":[{"op":"add","text":"会社の経費精算","due":"2026-10-29"}]}
+発言「3番と5番クリア」→ {"ops":[{"op":"done","no":3},{"op":"done","no":5}]}
+発言「2完了 あとアマゾンの返品、金曜まで」→ {"ops":[{"op":"done","no":2},{"op":"add","text":"Amazonの返品","due":"2026-10-30"}]}
+発言「1番の期限を来月5日に」→ {"ops":[{"op":"edit","no":1,"due":"2026-11-05"}]}`;
+  const body={systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:"今日: "+todayStr()+"("+wd(todayStr())+")\n現在の表: "+JSON.stringify(list)+"\n発言: "+text}]}],
     generationConfig:{temperature:0,responseMimeType:"application/json"}};
   const models=[LS.get("dc.gmodel3",""),"gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-3.5-flash","gemini-flash-lite-latest","gemini-flash-latest"].filter((x,i,a)=>x&&a.indexOf(x)===i);
   let last="",t0=Date.now();
@@ -589,11 +620,12 @@ document.addEventListener("click",e=>{
     case"cal-day":S.date=b.dataset.date;S.mode="check";scrollTo(0,0);break;
     case"t-open":S.tOpen=S.tOpen===b.dataset.id?null:b.dataset.id;renderTodo();return;
     case"t-save":{const x=D.todos[b.dataset.id];if(!x)return;const tx=$("te-text").value.trim();if(!tx){toast("TODOを入れてください");return}
-      x.text=tx;x.next=$("te-next").value.trim();x.status=$("te-st").value.trim();x.updated=Date.now();S.tOpen=null;touchTodos();toast("保存しました");renderTodo();return}
+      x.text=tx;x.due=$("te-due").value||"";x.status=$("te-st").value.trim();x.updated=Date.now();S.tOpen=null;touchTodos();toast("保存しました");renderTodo();return}
     case"t-done":{const x=D.todos[b.dataset.id];if(!x)return;S.tUndo=JSON.stringify(D.todos);D.tombs[x.id]=Date.now();delete D.todos[x.id];S.tOpen=null;S.tMsg="完了："+x.text;touchTodos();renderTodo();return}
     case"t-up":case"t-down":{const arr=todoArr(),i=arr.findIndex(t=>t.id===b.dataset.id),j=a==="t-up"?i-1:i+1;if(j<0||j>=arr.length)return;
       const now=Date.now(),oi=arr[i].order,oj=arr[j].order;arr[i].order=oj;arr[j].order=oi;if(oi===oj){arr[i].order=j;arr[j].order=i}arr[i].updated=now;arr[j].updated=now;touchTodos();renderTodo();return}
     case"t-send":sendTodo();return;
+    case"t-mic":startMic();return;
     case"t-undo":{if(!S.tUndo)return;const prev=JSON.parse(S.tUndo),now=Date.now();
       for(const id in D.todos)if(!prev[id]){D.tombs[id]=now;delete D.todos[id]}
       for(const id in prev){D.todos[id]=Object.assign({},prev[id],{updated:now});delete D.tombs[id]}
