@@ -139,17 +139,23 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .nobox:active{background:var(--done);border-color:var(--done);color:var(--surface)}
 .ttab td.due{width:4.2em;white-space:nowrap;font-family:var(--f-num);font-size:.85rem}
 .ttab td.due.over{color:var(--danger);font-weight:700}
-.tbox{position:relative;flex:1;min-width:0;display:flex}
-.tbox textarea{padding-right:48px!important}
-.mic{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--bg);font-size:1.1rem;display:grid;place-items:center}
+.tbox{flex:1;min-width:0;display:flex}
+.mic{flex:none;width:64px;height:64px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:1.7rem;display:grid;place-items:center}
+.tsend{flex:none;width:64px;height:64px;border-radius:12px;font-size:.95rem;font-weight:700;padding:0}
+.thist{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.thist h4{margin:0;padding:8px 12px;font-size:.75rem;color:var(--muted);border-bottom:1px solid var(--line)}
+.hrow{display:flex;gap:8px;align-items:center;padding:8px 12px;border-top:1px dashed var(--line);font-size:.85rem}
+.hrow:first-of-type{border-top:0}
+.hrow .tm{font-family:var(--f-num);font-size:.75rem;color:var(--muted);flex:none}
+.hrow .lb{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .mic.on{background:var(--danger);border-color:var(--danger);color:#fff;animation:pul 1s infinite}
 @keyframes pul{50%{opacity:.6}}
 @media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
 .ttab td.st{width:5.5em;font-size:.78rem;color:var(--muted);white-space:nowrap}
 .ttab tr.trow{cursor:pointer}
 .ttab tr.pin td{color:var(--star);font-weight:700}
-.tin{display:flex;gap:8px;align-items:flex-end;margin-top:16px}
-.tin textarea{flex:1;min-width:0;min-height:52px;resize:vertical;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tin{display:flex;gap:8px;align-items:flex-start;margin-top:16px}
+.tin textarea{flex:1;min-width:0;height:64px;min-height:64px;resize:vertical;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .tres{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--accent-soft);font-size:.85rem;display:flex;gap:8px;align-items:flex-start}
 .tres div{flex:1;min-width:0;white-space:pre-wrap}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.85rem;z-index:20;max-width:calc(100% - 32px)}
@@ -223,7 +229,7 @@ const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜
 
 (function(){
 "use strict";
-const VER="1.2.0", GOAL=0.8;
+const VER="1.3.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -247,7 +253,8 @@ const TSEED=[["免許証更新","更新期限・手続き方法を確認","2026-
 if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id])D.todos[id]={id,text:t[0],due:"",added:t[2],status:"",order:i+1,updated:1}})}
 D.settings=D.settings||{};
 const S={listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
-  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tUndo:null,tMsg:"",tBusy:false};
+  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tHist:LS.get("dc.thist",[]),tMsg:"",tBusy:false};
+function pushHist(label,before){const d=new Date();S.tHist.unshift({label,before,tm:(d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+":"+pad(d.getMinutes())});S.tHist=S.tHist.slice(0,5);LS.set("dc.thist",S.tHist)}
 
 function persist(){LS.set("dc.data",D)}
 const listsArr=()=>Object.values(D.lists).sort((a,b)=>(a.order||0)-(b.order||0)||(a.title<b.title?-1:1));
@@ -459,8 +466,9 @@ function renderTodo(){
     if(S.tOpen===t.id)h+=`<tr><td colspan="4"><div class="form" style="margin:0"><label>TODO<input class="in" id="te-text" value="${esc(t.text)}"></label><label>期限（空欄なら /）<input class="in" type="date" id="te-due" value="${esc(t.due||"")}"></label><label>状態（空欄なら〇日経過）<input class="in" id="te-st" value="${esc(t.status||"")}"></label>
       <div class="inl"><button class="btn" data-act="t-up" data-id="${esc(t.id)}" ${i===0?"disabled":""}>↑</button><button class="btn" data-act="t-down" data-id="${esc(t.id)}" ${i===arr.length-1?"disabled":""}>↓</button><span class="spacer"></span><button class="btn del" data-act="t-done" data-id="${esc(t.id)}">完了（消す）</button><button class="btn pri" data-act="t-save" data-id="${esc(t.id)}">保存</button></div></div></td></tr>`});
   h+=`<tr class="pin"><td class="no">★</td><td>神様の奇跡 3000万円達成</td><td class="due">/</td><td class="st">継続中</td></tr></tbody></table>`;
-  h+=`<div class="tin"><div class="tbox"><textarea id="t-input" placeholder="例：歯医者の予約 金曜まで　／　3完了"></textarea>${micOK()?`<button class="mic ${S.listening?"on":""}" data-act="t-mic" aria-label="音声入力">🎤</button>`:""}</div><button class="btn pri" data-act="t-send" ${S.tBusy?"disabled":""}>${S.tBusy?"処理中…":"送信"}</button></div>`;
-  if(S.tMsg)h+=`<div class="tres"><div>${esc(S.tMsg)}</div>${S.tUndo?'<button class="btn" data-act="t-undo">元に戻す</button>':""}</div>`;
+  h+=`<div class="tin"><div class="tbox"><textarea id="t-input" placeholder="例：歯医者の予約 金曜まで　／　3完了"></textarea></div>${micOK()?`<button class="mic ${S.listening?"on":""}" data-act="t-mic" aria-label="音声入力">🎤</button>`:""}<button class="btn pri tsend" data-act="t-send" ${S.tBusy?"disabled":""}>${S.tBusy?"処理中":"送信"}</button></div>`;
+  if(S.tMsg)h+=`<div class="tres"><div>${esc(S.tMsg)}</div></div>`;
+  if(S.tHist.length)h+=`<div class="thist"><h4>最近の変更（戻すと、それ以降の変更もまとめて戻ります）</h4>`+S.tHist.map((x,i)=>`<div class="hrow"><span class="tm">${esc(x.tm)}</span><span class="lb">${esc(x.label)}</span><button class="btn" data-act="t-undo" data-i="${i}">戻す</button></div>`).join("")+`</div>`;
   h+=`<details style="margin:18px 0 0"><summary>AIの設定（Gemini）</summary><div class="form"><label>Gemini APIキー${key?"（設定済み）":""}<input class="in" id="g-key" autocomplete="off" spellcheck="false" placeholder="AIza…" value=""></label>
     <div class="inl"><button class="btn pri" data-act="g-save">保存</button>${key?'<button class="btn" data-act="g-clear">キーを消す</button>':""}</div>
     <div class="note">キーは aistudio.google.com/apikey で作れます。同期しているPC・スマホすべてで使えます。未設定でも「3完了」「追記 ○○」の形なら反映します。</div></div></details>`;
@@ -475,7 +483,7 @@ function applyOps(ops){
     else if((o.op==="done"||o.op==="delete")&&t&&D.todos[t.id]){D.tombs[t.id]=now;delete D.todos[t.id];log.push("完了："+t.text)}
     else if(o.op==="edit"&&t&&D.todos[t.id]){const x=D.todos[t.id];if(o.text)x.text=String(o.text).trim().slice(0,60);if(o.due)x.due=o.due;x.updated=now;log.push("変更："+x.text)}
   }
-  if(log.length){S.tUndo=before;touchTodos()}
+  if(log.length){pushHist(log.join("\n"),before);touchTodos()}
   return log;
 }
 function ruleOps(text){
@@ -543,7 +551,7 @@ async function sendTodo(){
   try{
     try{ops=await geminiOps(text)}catch(e){ops=ruleOps(text);note=e.message==="nokey"?"":"（AIを使えなかったため簡易反映："+e.message+"）"}
     const log=applyOps(ops);
-    if(log.length){$("t-input").value="";S.tMsg=log.join("\n")+(note?"\n"+note:"")}else{S.tUndo=null;S.tMsg="反映できる操作がありませんでした"+(note?"\n"+note:"")}
+    if(log.length){$("t-input").value="";S.tMsg=log.join("\n")+(note?"\n"+note:"")}else{S.tMsg="反映できる操作がありませんでした"+(note?"\n"+note:"")}
   }catch(e){S.tMsg="エラー："+(e.message||e)}
   finally{S.tBusy=false;renderTodo()}
 }
@@ -621,15 +629,15 @@ document.addEventListener("click",e=>{
     case"t-open":S.tOpen=S.tOpen===b.dataset.id?null:b.dataset.id;renderTodo();return;
     case"t-save":{const x=D.todos[b.dataset.id];if(!x)return;const tx=$("te-text").value.trim();if(!tx){toast("TODOを入れてください");return}
       x.text=tx;x.due=$("te-due").value||"";x.status=$("te-st").value.trim();x.updated=Date.now();S.tOpen=null;touchTodos();toast("保存しました");renderTodo();return}
-    case"t-done":{const x=D.todos[b.dataset.id];if(!x)return;S.tUndo=JSON.stringify(D.todos);D.tombs[x.id]=Date.now();delete D.todos[x.id];S.tOpen=null;S.tMsg="完了："+x.text;touchTodos();renderTodo();return}
+    case"t-done":{const x=D.todos[b.dataset.id];if(!x)return;pushHist("完了："+x.text,JSON.stringify(D.todos));D.tombs[x.id]=Date.now();delete D.todos[x.id];S.tOpen=null;S.tMsg="";touchTodos();renderTodo();return}
     case"t-up":case"t-down":{const arr=todoArr(),i=arr.findIndex(t=>t.id===b.dataset.id),j=a==="t-up"?i-1:i+1;if(j<0||j>=arr.length)return;
       const now=Date.now(),oi=arr[i].order,oj=arr[j].order;arr[i].order=oj;arr[j].order=oi;if(oi===oj){arr[i].order=j;arr[j].order=i}arr[i].updated=now;arr[j].updated=now;touchTodos();renderTodo();return}
     case"t-send":sendTodo();return;
     case"t-mic":startMic();return;
-    case"t-undo":{if(!S.tUndo)return;const prev=JSON.parse(S.tUndo),now=Date.now();
+    case"t-undo":{const i=+b.dataset.i||0,hx=S.tHist[i];if(!hx)return;const prev=JSON.parse(hx.before),now=Date.now();
       for(const id in D.todos)if(!prev[id]){D.tombs[id]=now;delete D.todos[id]}
       for(const id in prev){D.todos[id]=Object.assign({},prev[id],{updated:now});delete D.tombs[id]}
-      S.tUndo=null;S.tMsg="元に戻しました";touchTodos();renderTodo();return}
+      S.tHist=S.tHist.slice(i+1);LS.set("dc.thist",S.tHist);S.tMsg="戻しました："+hx.label.split("\n")[0]+(hx.label.includes("\n")?" ほか":"");touchTodos();renderTodo();return}
     case"g-save":{const v=$("g-key").value.trim();if(!v){toast("キーを入力してください");return}D.settings.gemini={key:v,updated:Date.now()};LS.set("dc.gmodel","");touchTodos();toast("キーを保存しました");renderTodo();return}
     case"g-clear":D.settings.gemini={key:"",updated:Date.now()};touchTodos();toast("キーを消しました");renderTodo();return;
     default:return;
