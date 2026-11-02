@@ -115,6 +115,21 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .bbar .in2{max-width:640px;margin:0 auto;display:flex;gap:8px}
 .bbtn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-weight:700;font-size:.9rem}
 .bbtn.back{background:var(--accent);border-color:var(--accent);color:var(--onacc)}
+.seg{display:flex;gap:4px;flex:none}
+.seg button{min-width:38px;height:34px;padding:0 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:.9rem;color:var(--muted)}
+.seg button.sel{background:var(--accent);border-color:var(--accent);color:var(--onacc)}
+.seg button.sel.o{background:var(--done);border-color:var(--done)}
+.seg button.sel.x{background:var(--danger);border-color:var(--danger)}
+.seg button.sel.t{background:var(--star);border-color:var(--star)}
+.seg button.auto{outline:2px dashed var(--done);outline-offset:1px;color:var(--done)}
+.vrow{display:flex;gap:10px;align-items:center}
+.vrow .txt{flex:1;min-width:0}
+.vin{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:.95rem}
+.vin.num{width:5.5em;text-align:right;font-family:var(--f-num)}
+.vin.wide{width:100%;margin-top:6px}
+.unit{font-size:.82rem;color:var(--muted);flex:none}
+.autonote{font-size:.72rem;color:var(--done);margin:4px 0 0}
+.outbox{width:100%;min-height:260px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:.85rem;line-height:1.6;white-space:pre-wrap;resize:vertical}
 .calhead{display:flex;align-items:center;gap:8px;margin-top:16px}
 .calhead h1{flex:1;margin:0;font-size:1.3rem;text-align:center}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:12px}
@@ -191,6 +206,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
       <label>セクション<select class="in" id="add-sec"></select></label>
       <label>チェック項目<input class="in" type="text" id="add-text" placeholder="例：午後イチに水を500ml" required></label>
       <label>詳細（任意・折りたたみ表示）<textarea class="in" id="add-detail" placeholder="なぜ効くか、手順など"></textarea></label>
+      <div id="add-typebox"></div>
       <div class="inl"><label class="ck"><input type="checkbox" id="add-star"> ★重要</label><span class="spacer"></span><button class="btn pri" type="submit">追加</button></div>
     </form>
   </div>
@@ -227,9 +243,11 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 <script>
 const SEED={"title": "昼の切り替えチェック", "subtitle": "12:30／1〜3分　達観プライミング：朝・昼に1分で読む", "order": 1, "sections": [{"id": "hs0", "title": "重要ポイント（最初に1回読む）", "items": [{"id": "h0_0", "text": "不安が注意を狭め、リラックスが周辺視野を広げる", "detail": "反芻を止め、脳をクリアにする。好機の看板に気づける人になる。", "star": false}]}, {"id": "hs1", "title": "体を戻す", "items": [{"id": "h1_0", "text": "1分呼吸（共鳴呼吸＝1分6回）＋25分タイマーを再セット", "detail": "決定：1分呼吸を「全アクションの起点」にする。25分に一度1分（10秒呼吸に意識を向ける）。\nなぜ効く：呼吸は「やる気」でなく「きっかけ不足」で続かない。行動の前に固定すると、\n　既存の行動すべてが自動のきっかけになる（habit stacking）。思考をいじる前に自律神経を下げる方が速い。\n手順：各タスクを始める直前に、長い呼気を1回。特に固定するのは\n　・PCで作業を始める前\n　・会議、面談の前\n　・メール、チャットを返す前\n　・移動、待ち時間（エレベーター、信号）", "star": false}, {"id": "h1_1", "text": "笑顔／肩を落とす／腹を凹ませる", "detail": "", "star": true}, {"id": "h1_2", "text": "水は午前で1L飲めたか", "detail": "", "star": false}, {"id": "h1_3", "text": "午後の休憩ルール：50分作業＋5分休憩（1時間に1回は休憩）", "detail": "", "star": false}, {"id": "h1_4", "text": "瞑想：今日あと何回か（×3回 or 合計10分）", "detail": "", "star": false}]}, {"id": "hs2", "title": "頭を戻す", "items": [{"id": "h2_0", "text": "反芻や不安を、頭の中で考えていないか", "detail": "悩まない運用＝「自分の頭を信頼しない・頭で抱えない」\n決定：優柔不断を断つ。頭の中で考えない。10分以上はAIで悩まない。\nなぜ効く：頭の中の反芻はワーキングメモリを食い、最良探し（maximizing）で結論が出ない。\n　外に出した瞬間に停止できる。そもそも悩む2択に有意差はほぼない。\n手順（段階的に外へ出す）：\n　・5分で決まらない → ノートに書く（頭から出す）\n　・10分で決まらない → AIに投げる（自分の頭で抱えない）", "star": false}, {"id": "h2_1", "text": "意味付けしていないか", "detail": "", "star": true}, {"id": "h2_2", "text": "課題の分離：業者・相手に投げた時点で、私の手を離れている", "detail": "相手がどう吠えてこようが、業者に投げた時点で私の手を離れている。\nそれからの遅延についてなんと言おうが知ったこと。", "star": false}, {"id": "h2_3", "text": "一歩引いて考えたか", "detail": "「これは言うべきか？」「これは自分の課題か？」\n「この90点のゴールはどこか（メタ認知）」「AIで代替できないか？」", "star": false}, {"id": "h2_4", "text": "「〇〇、今どうする？」と自分に聞く（メタ認知＋不完全主義）", "detail": "決定：常に一歩引いて物事を捉える。どうしたらこの仕事は無駄なく終わるか。\n　悩んだ際は、ノートに別認証として記載。\nなぜ効く：一人称「なぜ私は動揺しているのか」は反芻を強める。自分の名前＋二人称にすると、\n　他人に助言する時の冷静な認知モードが起動する（ソロモンのパラドックス＝人は他人の問題には賢く答えられる）。\n　認知負荷ほぼゼロで即使える（Kross 2014）。\n実践フレーズ：\n　「これのゴールはどこだ。AIでの解決は可能か。」\n　「課題の分離をするとどうなるか。どこまでが事実で、どこからが妄想か。私に対応できるのはどこまでか。」\n　「過去のことは考えても、振り返るな。」\n自動発火のif-then：\n　カッとした／不安で胸がざわついたら → 心の中で「〇〇、今どうする？」\n　ここで答えを出そうとしない。距離を取る問いを1回入れるだけ。答えは落ち着いてから。", "star": false}, {"id": "h2_5", "text": "達観思考：事実と解釈を分け、前だけ見る", "detail": "", "star": false}, {"id": "h2_6", "text": "全力感謝／ツイてる（午前の良かったことを1つ思い出す）", "detail": "", "star": false}]}, {"id": "hs3", "title": "午後を決める", "items": [{"id": "h3_0", "text": "午後の最重要1つを決める（選択と集中）", "detail": "", "star": false}, {"id": "h3_1", "text": "カエルを食べる：昨日のメール・厄介な未完了に少しでも着手", "detail": "朝のカエル手順（先送りを断つ実装）\n決定：今日の仕事の確認 →（急ぎの今日の仕事）→ 昨日のメール対応 → 今日の仕事、の順でカエルを食べる。\nなぜ効く：「昨日の案件に必ず着手」を固定順に埋め込むと、先送り（慢性ストレス源）が物理的に封じ込まれる。\n手順：\n　1. 今日の仕事をざっと確認（＋5分ブレインダンプで気がかりを全部出す）\n　2. 今日必須の急ぎだけ先に処理\n　3. 昨日のメール／案件に必ず着手（ここが要）\n　4. 残りの今日の仕事", "star": false}, {"id": "h3_2", "text": "気がかり・未完了タスクを書き出した（アップノート）", "detail": "", "star": false}, {"id": "h3_3", "text": "メールチェックは1日3回まで（午後はあと何回か）", "detail": "", "star": false}]}, {"id": "hs4", "title": "午後の場面別ルール（その場で使う）", "items": [{"id": "h4_0", "text": "カッとしたら：長い呼吸 → 発言しない", "detail": "つまらないジョークを言わない。人を悪く言わない。どうせ後で反芻して時間と精神を削る。\n相手のためではなく、自分の余力を守るために怒らない。言わない。\n決定：苛立ったら発言しない（だいたい後で後悔する）。まず長い呼吸を一拍。\nなぜ効く：頭が落ちた\"ホット状態\"で言葉を出すと後悔→反芻。\n　必要なのは感情を消すことでなく、感情と行動を切り離す＝反応を遅らせること。\n　身体（呼吸）が先、頭を使う再解釈は後（コールド時）。\n手順（カッとなった瞬間）：\n　1. 長い呼気を1回（身体、思考不要）\n　2. 発言・返信を保留（即レス禁止 → 10分後 or 翌日に判断）\n　　「逃げられるなら、確認して明日連絡します」スタンス\n　3. 席を立つ／水を飲む（運動指令に逃がす）\n　4. 犬が吠えている、と考える\nその場レバー（身体で戻す）：深い呼吸とアロマ／水を飲む／立って歩く30秒／目薬の点眼／\n　肩を落として姿勢を正す／冷たい水で手を洗う・顔に触れる／脈を図ることに集中する\n共通原理：頭で考え直すのでなく、身体・感覚・視線を動かして注意を切る。", "star": false}, {"id": "h4_1", "text": "話すとき：結論 → 根拠 → たとえ → 相手の次の行動", "detail": "論理的に話し、達観的な思考を持つ。3点に削る。これだけで30秒は成立する。\n型：\n　1. 結論を先に一言（「AよりBがいい」）\n　2. 根拠を1〜3個（「理由は〜だから」）\n　3. 具体例かたとえを1つ（「たとえば〜」）\n　4. 相手の次の行動（「だから〜してほしい」）\n効かせるコツ：\n　・目的は「相手が動く」こと。うまく話すことではない\n　・相手の頭にある言葉に合わせる（難しい語彙は不要）\n　・主観、言い訳、希望的観測は必ず削る。削った方が伝わる\n　・全体像 → 詳細の順。いきなり細部に入らない", "star": false}]}, {"id": "hs5", "title": "今夜を決める", "items": [{"id": "h5_0", "text": "禁止doを確認した", "detail": "", "star": false}, {"id": "h5_1", "text": "今夜の自分の時間：0H／1H／2H のどれにするか決める", "detail": "", "star": false}]}], "id": "hiru", "updated": 1, "remind": "12:30"};
 
+const SEED2=[{"id": "asa", "title": "朝の確認チェック", "subtitle": "6:30〜11:00に表示", "remind": "06:30", "order": 0, "updated": 2, "slot": "morning", "sections": [{"id": "as0", "title": "朝起きて最初にやること", "items": [{"id": "a0_0", "text": "ツイてる連呼、感謝連呼", "detail": "", "star": false}, {"id": "a0_1", "text": "アファメーションを叫ぶ", "detail": "ありがとう（昨日の感謝を込めて）私は2026年のうちに、3000万円を、仮想通貨で取り戻した！お陰で、毎月24万の不労所得だけで暮らせてるよありがとう！！\nおかげで、一番欲しかった安心と時間を手に入れ、毎日ストレスなく、自由に楽しく、筋トレ、勉強、自分自身を更によりよく磨くことができているよ！！", "star": false}, {"id": "a0_2", "text": "前日の日記チェック", "detail": "", "star": false}, {"id": "a0_3", "text": "学習の復習", "detail": "", "star": false}]}, {"id": "as1", "title": "朝のメイン", "items": [{"id": "a1_0", "text": "達観プライミング", "detail": "無駄な感情（過剰反応・長引く反芻・他人軸の揺れ・無意味な自己消耗）に支配される時間と強度を減らす。\n\n災難が起きたら ⇒ 一歩引く ⇒ 紙に書いて情報整理 or GPTに吐き出す\n①脅威を過大 ②問題の複雑さを過大 ③自分の対処力を過小\nが重なるとストレス激増。\n\n出来事から常に一歩引き反応を防ぐ\n苦しみは出来事への反応から来る。出来事は変えられないが、反応は訓練できる。事実と解釈を混ぜない。\n意味付けを行わない。因果関係はない。雨が降ることは雨が降ること以上の意味はない。被害者意識と主人公意識によるもの。\n\n時間＝心の余裕\n心の余裕は時間の余裕から来る。\n・厄介な業務は朝、昼に作成まで実施。\n・脳は思考するためだけに使う。厄介ごとはTODO＋時間まで決める、業務はTODOへ、不安は紙へ。\n・12時・14時に見直し枠、1時間の対応バッファを死守。焦りは予定の詰めすぎから来る。\n\n課題の線\n自分の課題（自分の行動で変わるもの）と、相手の課題（相手の感情・評価・反応・過去）を分ける。\n相手の評価は相手の出力であって、私の価値とは別物。操作できる側だけ動かす。\n\n怒り\n怒りは「こうあるべき」が外れた反応。長い呼気で覚醒を下げ、燃料として静かに使う。\n対処中は自分をロボット、相手を\"嵐\"とみなす。憎まず、ただ処理する。\n\n不安・反芻\n不安は準備に変える。変えられないなら切る。反芻は思考ではなく消耗。\n妄想に気づいたら、最小行動を1つ決めて閉じる。それ以上は回さない。\n\n悩み\n悩みは基本的に無駄。どちらでもいいから悩んでいる。\n直感は7割正しい。決めて、選ばなかった方を否定しない。\n\n観察者モード（人の振り見て我が振り直せ）\n誰かが課題分離できず取り乱してるをみて、嘲笑え！\nそのうえで\"自分が踏みやすい べき\"を1つだけ点検する。優越感は燃費が悪く、調子が悪い日に崩れる。残すのは静かな観察だけ。\n\nストレスの扱い\nストレスはゼロにするものではなく、最適化するもの。\n本番の緊張・高鳴りは「役に立つ燃料」と捉える（怒りだけは別＝覚醒を下げる）。", "star": false}, {"id": "a1_1", "text": "習慣PDCAの改善、反省、TODOの確認", "detail": "", "star": false}]}, {"id": "as2", "title": "V5 学習", "items": [{"id": "a2_0", "text": "一日一冊の読書ができたか", "detail": "", "star": false}, {"id": "a2_1", "text": "前回の学習の重要論点を想起できた", "detail": "", "star": false}, {"id": "a2_2", "text": "今日学んだ重要論点3点をアウトプット＋何に使えるか（1行）", "detail": "", "star": false}, {"id": "a2_3", "text": "Audibleは15分ごとに止めてアウトプット（ながら聞きを能動想起に）", "detail": "", "star": false}]}, {"id": "as3", "title": "V8 自己統治", "items": [{"id": "a3_0", "text": "朝TODO", "detail": "", "star": false, "type": "choice", "opts": ["2H", "1.5H", "1H"]}, {"id": "a3_1", "text": "起床直後スマホ・二度寝をしない", "detail": "", "star": false}]}, {"id": "as4", "title": "V11 方向一致（FIRE／3000万円）※時間で記録", "items": [{"id": "a4_0", "text": "収益直結", "detail": "", "star": false, "type": "num", "unit": "h", "note": "内容：note／Polymarket／トレード分析／投資／その他"}, {"id": "a4_1", "text": "収益間接", "detail": "", "star": false, "type": "num", "unit": "h", "note": "内容：リサーチ／学習／ツール改善"}, {"id": "a4_2", "text": "今日の収益行動と3000万円ゴールの接続1行", "detail": "", "star": false, "type": "text"}]}]},{"id": "yoru", "title": "夜の答え合わせ", "subtitle": "17:00〜24:00に表示　TODO採点：達成率×100＝出力点（目標80）", "remind": "18:00", "order": 2, "updated": 2, "slot": "night", "sections": [{"id": "ys1", "title": "V1 健康", "items": [{"id": "y1_0", "text": "睡眠8h", "detail": "", "star": false, "type": "tri"}, {"id": "y1_1", "text": "運動（該当日）", "detail": "", "star": false, "type": "tri"}, {"id": "y1_2", "text": "16h断食", "detail": "", "star": false, "type": "tri"}, {"id": "y1_3", "text": "野菜・たんぱく質", "detail": "", "star": false, "type": "tri"}, {"id": "y1_4", "text": "自然散歩", "detail": "", "star": false, "type": "tri"}]}, {"id": "ys2", "title": "V2 情緒", "items": [{"id": "y2_0", "text": "10分瞑想", "detail": "", "star": false, "type": "tri", "auto": "瞑想"}, {"id": "y2_1", "text": "感情ラベリング", "detail": "今の感情に名前をつける＝反応が一段下がる", "star": false, "type": "tri", "auto": "感情ラベリング"}, {"id": "y2_2", "text": "課題の分離", "detail": "自分の課題／相手の課題を切り分ける", "star": false, "type": "tri", "auto": "課題の分離"}, {"id": "y2_3", "text": "徐呼吸", "detail": "1分6回のゆっくり呼吸で高ぶりを鎮める。高ぶり日のみ", "star": false, "type": "tri", "auto": "カッとしたら|長い呼吸"}, {"id": "y2_4", "text": "達観1分ワーク", "detail": "事実と解釈を分け、前だけ見てリフレーム", "star": false, "type": "tri", "auto": "達観"}, {"id": "y2_5", "text": "毎時1分呼吸", "detail": "1時間ごとに深呼吸で仕切り直し", "star": false, "type": "tri", "auto": "1分呼吸"}, {"id": "y2_6", "text": "寝る前ボディスキャン", "detail": "体の各部に順に注意を向けて弛緩・入眠", "star": false, "type": "tri"}, {"id": "y2_7", "text": "10分以上悩まない", "detail": "5分でノート/AIに投げる＝悩む時間の上限", "star": false, "type": "tri", "auto": "反芻"}, {"id": "y2_8", "text": "厄介ごとを先送りせず処理", "detail": "先送り＝ストレス源", "star": false, "type": "tri", "auto": "厄介"}]}, {"id": "ys3", "title": "V2 情緒（午後版）", "items": [{"id": "y3_0", "text": "12:30の昼休み以降にできなかったもの", "detail": "", "star": false, "type": "text"}]}, {"id": "ys4", "title": "V3 認知（頭のキレ・WM）", "items": [{"id": "y4_0", "text": "メールチェックを1日3回までにまとめた", "detail": "", "star": false, "type": "tri", "auto": "メールチェック"}, {"id": "y4_1", "text": "厄介な未完了タスクに、完璧でなくても少しでも取り組んだ", "detail": "", "star": false, "type": "tri", "auto": "厄介"}, {"id": "y4_2", "text": "気がかり・未完了タスクを書き出して頭から出しているか", "detail": "", "star": false, "type": "tri", "auto": "気がかり"}]}, {"id": "ys5", "title": "V4 タイパ（および時短）", "items": [{"id": "y5_0", "text": "最重要1つを実行（選択と集中）", "detail": "", "star": false, "type": "tri", "auto": "最重要"}, {"id": "y5_1", "text": "やらないこと1つ（今日やらないと決めた1つを守る）", "detail": "", "star": false, "type": "tri"}, {"id": "y5_2", "text": "同一論点で4往復目に入らない／「AIに任せられるか」自問", "detail": "BESTでなくBETTERを1/4の時間で", "star": false, "type": "tri"}]}, {"id": "ys6", "title": "V5 学習", "items": [{"id": "y6_0", "text": "前回の学習の重要論点を想起できた", "detail": "", "star": false, "type": "tri", "auto": "前回の学習"}, {"id": "y6_1", "text": "今日学んだ重要論点3点をアウトプット＋何に使えるか（1行）", "detail": "", "star": false, "type": "tri", "auto": "重要論点3点"}, {"id": "y6_2", "text": "Audibleは15分ごとに止めてアウトプット", "detail": "ながら聞きを能動想起に", "star": false, "type": "tri", "auto": "Audible"}]}, {"id": "ys7", "title": "V8 自己統治", "items": [{"id": "y7_0", "text": "朝TODO", "detail": "", "star": false, "type": "choice", "opts": ["2H", "1.5H", "1H"], "auto": "^朝TODO"}, {"id": "y7_1", "text": "夜30分TODO", "detail": "", "star": false, "type": "tri"}, {"id": "y7_2", "text": "オーディブル", "detail": "PC前・着席中の視聴は不可", "star": false, "type": "num", "unit": "h"}, {"id": "y7_3", "text": "起床直後スマホ・二度寝をしない", "detail": "", "star": false, "type": "tri", "auto": "起床直後"}, {"id": "y7_4", "text": "コントロール率", "detail": "", "star": false, "type": "num", "unit": "/100"}]}, {"id": "ys8", "title": "V11 方向一致（FIRE／3000万円）※時間で記録", "items": [{"id": "y8_0", "text": "収益直結", "detail": "", "star": false, "type": "num", "unit": "h", "note": "内容：note／Polymarket／トレード分析／投資／その他", "auto": "^収益直結"}, {"id": "y8_1", "text": "収益間接", "detail": "", "star": false, "type": "num", "unit": "h", "note": "内容：リサーチ／学習／ツール改善", "auto": "^収益間接"}, {"id": "y8_2", "text": "今日の収益行動と3000万円ゴールの接続1行", "detail": "", "star": false, "type": "text", "auto": "接続1行"}]}]}];
+
 (function(){
 "use strict";
-const VER="1.3.0", GOAL=0.8;
+const VER="1.4.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -251,7 +269,8 @@ if(!D||!D.lists){D={lists:{},days:{},tombs:{}};D.lists[SEED.id]=clone(SEED)}
 D.days=D.days||{};D.tombs=D.tombs||{};
 const TSEED=[["免許証更新","更新期限・手続き方法を確認","2026-09-29"],["健康診断","予約・受診日を確定","2026-10-18"],["イヤホンの線","対応内容・期限を確定","2026-10-20"],["まつ毛美容液","購入・確認","2026-10-24"],["催眠術を受けに行く","予約先・日程を確定","2026-10-24"],["余裕の目安金額の再計算","前提（支出・目標・期間）を確定して試算","2026-10-23"],["今のボトムに残り全額を投入するシミュレーション","投入額・時期・シナリオを確定して試算","2026-10-23"],["法人の赤字を給与所得から税引きできないか確認","税理士・制度で可否を確認","2026-10-24"]];
 if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id])D.todos[id]={id,text:t[0],due:"",added:t[2],status:"",order:i+1,updated:1}})}
-D.settings=D.settings||{};
+D.settings=D.settings||{};D.tdone=D.tdone||{};
+SEED2.forEach(x=>{if(!D.lists[x.id]&&!D.tombs[x.id])D.lists[x.id]=clone(x)});
 const S={listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
   collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tHist:LS.get("dc.thist",[]),tMsg:"",tBusy:false};
 function pushHist(label,before){const d=new Date();S.tHist.unshift({label,before,tm:(d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+":"+pad(d.getMinutes())});S.tHist=S.tHist.slice(0,5);LS.set("dc.thist",S.tHist)}
@@ -261,11 +280,31 @@ const listsArr=()=>Object.values(D.lists).sort((a,b)=>(a.order||0)-(b.order||0)|
 const cur=()=>D.lists[S.listId]||listsArr()[0]||null;
 const allItems=l=>l?l.sections.flatMap(s=>s.items):[];
 const checksOf=(lid,d)=>((D.days[d]||{}).c||{})[lid]||{};
-const isOn=(lid,iid,d)=>{const v=checksOf(lid,d)[iid];return !!(v&&v[0])};
-function ratio(l,d){const it=allItems(l);if(!it.length)return 0;return it.filter(i=>isOn(l.id,i.id,d)).length/it.length}
+const SLOTMAP={asa:"morning",hiru:"noon",yoru:"night"},SLOTJ={morning:"朝",noon:"昼",night:"夜"};
+const slotOf=l=>l&&(l.slot||SLOTMAP[l.id])||"";
+const tyOf=it=>it.type||"check";
+const rawV=(lid,iid,d)=>{const v=checksOf(lid,d)[iid];return v?v[0]:undefined};
+function answered(type,v){if(type==="check")return v===true;if(type==="tri")return v==="o"||v==="t"||v==="x";return v!=null&&v!==""&&v!==false}
+function derived(lid,it,d){
+  if(!it.auto)return undefined;let re;try{re=new RegExp(it.auto)}catch(e){return undefined}
+  const ty=tyOf(it);
+  for(const l2 of listsArr()){if(l2.id===lid)continue;for(const s2 of allItems(l2)){if(!re.test(s2.text))continue;
+    const sv=rawV(l2.id,s2.id,d),st=tyOf(s2);if(!answered(st,sv))continue;
+    if(ty==="tri"){if(st==="check")return "o";if(st==="tri")return sv;continue}
+    if(ty==="check"){if(st==="check"||(st==="tri"&&sv==="o"))return true;continue}
+    if(ty===st)return sv}}
+  return undefined;
+}
+function derivedNote(lid,it,d){if(!it.auto||!it.note)return "";let re;try{re=new RegExp(it.auto)}catch(e){return ""}
+  for(const l2 of listsArr()){if(l2.id===lid)continue;for(const s2 of allItems(l2)){if(re.test(s2.text)&&s2.note){const n=rawV(l2.id,s2.id+"~n",d);if(n)return n}}}return ""}
+function effV(lid,it,d){const v=rawV(lid,it.id,d),ty=tyOf(it);if(answered(ty,v))return{v,auto:false};const dv=derived(lid,it,d);return answered(ty,dv)?{v:dv,auto:true}:{v:undefined,auto:false}}
+function scoreOf(it,v){const ty=tyOf(it);if(ty==="tri")return v==="o"?1:v==="t"?0.5:0;return answered(ty,v)?1:0}
+const isOn=(lid,iid,d)=>{const l=D.lists[lid];const it=l&&allItems(l).find(x=>x.id===iid);if(!it)return false;return answered(tyOf(it),effV(lid,it,d).v)};
+function ratio(l,d){const its=allItems(l);if(!its.length)return 0;return its.reduce((a,it)=>a+scoreOf(it,effV(l.id,it,d).v),0)/its.length}
 function streak(l){const t=todayStr();let d=ratio(l,t)>=GOAL?t:addDays(t,-1),n=0;while(ratio(l,d)>=GOAL&&n<800){n++;d=addDays(d,-1)}return n}
 function touchList(l){l.updated=Date.now();D.lists[l.id]=l;persist();schedulePush();pushNative()}
 function setCheck(lid,iid,on){const d=S.date,day=D.days[d]=D.days[d]||{c:{},m:{}};day.c=day.c||{};const c=day.c[lid]=day.c[lid]||{};c[iid]=[!!on,Date.now()];persist();schedulePush();pushNative()}
+function setVal(lid,iid,v){const d=S.date,day=D.days[d]=D.days[d]||{c:{},m:{}};day.c=day.c||{};const c=day.c[lid]=day.c[lid]||{};c[iid]=[v,Date.now()];persist();schedulePush();pushNative()}
 function setMemo(lid,text){const d=S.date,day=D.days[d]=D.days[d]||{c:{},m:{}};day.m=day.m||{};day.m[lid]=[text,Date.now()];persist();schedulePush()}
 const memoOf=(lid,d)=>{const v=((D.days[d]||{}).m||{})[lid];return v?v[0]:""};
 
@@ -286,7 +325,9 @@ function mergeData(R){
     if(!t||!t.id||typeof t.text!=="string")continue;const o=TD[t.id];if(!o||(+t.updated||0)>(+o.updated||0))TD[t.id]=t}
   for(const k in TD)if((T[k]||0)>=(+TD[k].updated||0))delete TD[k];
   const ST=Object.assign({},R.settings||{});for(const k in (D.settings||{})){const a=D.settings[k],b=ST[k];if(!b||(+a.updated||0)>(+b.updated||0))ST[k]=a}
-  D={lists:L,days,tombs:T,todos:TD,settings:ST};persist();
+  const TDN=Object.assign({},R.tdone||{});for(const k in (D.tdone||{})){const a=D.tdone[k],b=TDN[k];if(!b||(+a.updated||0)>(+b.updated||0))TDN[k]=a}
+  for(const k in TDN)if(TDN[k].date<addDays(todayStr(),-60))delete TDN[k];
+  D={lists:L,days,tombs:T,todos:TD,settings:ST,tdone:TDN};persist();
 }
 function stable(o){if(Array.isArray(o))return "["+o.map(stable).join(",")+"]";if(o&&typeof o==="object")return "{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+stable(o[k])).join(",")+"}";return JSON.stringify(o)}
 
@@ -317,7 +358,7 @@ async function sync(){
     const g=await findGist();let before="";
     if(g){const f=g.files[GFILE];let txt=f.content;if(f.truncated)txt=await (await fetch(f.raw_url,{cache:"no-store"})).text();
       before=txt;try{mergeData(JSON.parse(txt))}catch(_){}}
-    const out=stable({app:"daily-check",v:1,lists:D.lists,days:D.days,tombs:D.tombs,todos:D.todos,settings:D.settings});
+    const out=stable({app:"daily-check",v:1,lists:D.lists,days:D.days,tombs:D.tombs,todos:D.todos,settings:D.settings,tdone:D.tdone});
     if(out!==before){
       if(g)await ghFetch("/gists/"+g.id,{method:"PATCH",body:JSON.stringify({files:{[GFILE]:{content:out}}})});
       else{const ng=await ghFetch("/gists",{method:"POST",body:JSON.stringify({description:GDESC,public:false,files:{[GFILE]:{content:out}}})});gh.gist=ng.id;LS.set("dc.gh",gh)}
@@ -362,22 +403,60 @@ function renderSide(){
   const m=$("memo");if(document.activeElement!==m)m.value=memoOf(l.id,S.date);
   const sel=$("add-sec"),v=sel.value;sel.innerHTML=l.sections.map(s=>`<option value="${esc(s.id)}">${esc(s.title)}</option>`).join("");
   if(l.sections.some(s=>s.id===v))sel.value=v;
+  const tb=$("add-typebox");if(tb&&!tb.innerHTML)tb.innerHTML=typeFields("add",{type:slotOf(l)==="night"?"tri":"check"});
 }
 function itemHTML(l,s,it,i){
-  const on=isOn(l.id,it.id,S.date);
+  const ty=tyOf(it),ev=effV(l.id,it,S.date),on=answered(ty,ev.v);
   if(S.editing===it.id){const D2=S.draft;return `<li class="item"><div class="form">
-    <label>チェック項目<input class="in" type="text" id="ed-text" value="${esc(D2.text)}"></label>
+    <label>項目<input class="in" type="text" id="ed-text" value="${esc(D2.text)}"></label>
     <label>詳細（折りたたみ表示）<textarea class="in" id="ed-detail">${esc(D2.detail)}</textarea></label>
+    ${typeFields("ed",D2)}
     <div class="inl"><label class="ck"><input type="checkbox" id="ed-star" ${D2.star?"checked":""}> ★重要</label><span class="spacer"></span>
       <button class="btn" type="button" data-act="i-up" data-item="${esc(it.id)}" ${i===0?"disabled":""}>↑</button>
       <button class="btn" type="button" data-act="i-down" data-item="${esc(it.id)}" ${i===s.items.length-1?"disabled":""}>↓</button></div>
     <div class="inl"><button class="btn del" type="button" data-act="i-del" data-item="${esc(it.id)}">${S.confirm==="i"+it.id?"もう一度押すと削除":"削除"}</button><span class="spacer"></span>
       <button class="btn" type="button" data-act="i-cancel">やめる</button><button class="btn pri" type="button" data-act="i-save" data-item="${esc(it.id)}">保存</button></div></div></li>`}
   if(S.onlyOpen&&on&&!S.edit)return "";
-  return `<li class="item"><div class="itemline"><label class="row"><input type="checkbox" id="c-${esc(it.id)}" data-act="check" data-item="${esc(it.id)}" ${on?"checked":""}><span class="box"></span>
-    <span class="txt">${it.star?'<span class="star">★</span>':""}${esc(it.text)}</span></label>
-    ${S.edit?`<button class="ebtn" data-act="i-edit" data-item="${esc(it.id)}">編集</button>`:""}</div>
-    ${it.detail?`<details data-det="${esc(it.id)}" ${S.openDet.has(it.id)?"open":""}><summary>詳細</summary><div class="detail">${esc(it.detail)}</div></details>`:""}</li>`;
+  const label=`<span class="txt">${it.star?'<span class="star">★</span>':""}${esc(it.text)}</span>`,eb=S.edit?`<button class="ebtn" data-act="i-edit" data-item="${esc(it.id)}">編集</button>`:"";
+  const det=it.detail?`<details data-det="${esc(it.id)}" ${S.openDet.has(it.id)?"open":""}><summary>詳細</summary><div class="detail">${esc(it.detail)}</div></details>`:"";
+  let body;
+  if(ty==="check")body=`<div class="itemline"><label class="row"><input type="checkbox" id="c-${esc(it.id)}" data-act="check" data-item="${esc(it.id)}" ${rawV(l.id,it.id,S.date)===true?"checked":""}><span class="box"></span>${label}</label>${eb}</div>${ev.auto&&on?'<p class="autonote">朝・昼のチェックから自動反映</p>':""}`;
+  else if(ty==="tri"||ty==="choice"){const opts=ty==="tri"?[["o","〇"],["t","▲"],["x","×"]]:(it.opts||[]).map(o=>[o,o]);
+    body=`<div class="vrow">${label}<span class="seg">${opts.map(([v,t])=>`<button class="${ev.v===v?(ev.auto?"auto":"sel "+v):""}" data-act="val" data-item="${esc(it.id)}" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</span>${eb}</div>${ev.auto?'<p class="autonote">朝・昼の入力から自動反映（押すと上書き）</p>':""}`}
+  else if(ty==="num"){const own=rawV(l.id,it.id,S.date),note=rawV(l.id,it.id+"~n",S.date)||"";
+    body=`<div class="vrow">${label}<input class="vin num" type="number" inputmode="decimal" step="0.5" min="0" data-vitem="${esc(it.id)}" value="${esc(answered("num",own)?own:"")}" placeholder="${ev.auto?esc(ev.v):""}"><span class="unit">${esc(it.unit||"")}</span>${eb}</div>${it.note?`<input class="vin wide" type="text" data-vnote="${esc(it.id)}" value="${esc(note)}" placeholder="${esc(ev.auto?(derivedNote(l.id,it,S.date)||it.note):it.note)}">`:""}${ev.auto?'<p class="autonote">朝の入力から自動反映（入力すると上書き）</p>':""}`}
+  else{const own=rawV(l.id,it.id,S.date);body=`<div class="vrow">${label}${eb}</div><input class="vin wide" type="text" data-vitem="${esc(it.id)}" value="${esc(answered("text",own)?own:"")}" placeholder="${ev.auto?esc(ev.v):"記入"}">${ev.auto?'<p class="autonote">朝の入力から自動反映（入力すると上書き）</p>':""}`}
+  return `<li class="item">${body}${det}</li>`;
+}
+function typeFields(p,D2){const t=D2.type||"check";return `<div class="inl"><label style="flex:1;min-width:8em">種類<select class="in" id="${p}-type"><option value="check" ${t==="check"?"selected":""}>チェック</option><option value="tri" ${t==="tri"?"selected":""}>〇▲×</option><option value="choice" ${t==="choice"?"selected":""}>選択肢</option><option value="num" ${t==="num"?"selected":""}>数値</option><option value="text" ${t==="text"?"selected":""}>1行メモ</option></select></label>
+  <label style="flex:2;min-width:10em">選択肢（カンマ区切り）／単位<input class="in" id="${p}-opts" value="${esc(t==="num"?(D2.unit||""):(D2.opts||[]).join(","))}" placeholder="例：2H,1.5H,1H　／　h"></label></div>
+  <label>連動キーワード（他のリストでこの言葉を含む項目にチェックがあれば自動反映）<input class="in" id="${p}-auto" value="${esc(D2.auto||"")}" placeholder="例：瞑想"></label>`}
+function readType(p){const type=$(p+"-type").value,o=$(p+"-opts").value.trim(),auto=$(p+"-auto").value.trim();const r={type:type==="check"?undefined:type,auto:auto||undefined,opts:undefined,unit:undefined};
+  if(type==="choice")r.opts=o.split(/[,、，]/).map(x=>x.trim()).filter(Boolean);if(type==="num")r.unit=o;return r}
+/* ---------- night report ---------- */
+function buildReport(d){
+  const L=listsArr(),out=[],w=wd(d);out.push(`【${d.replace(/-/g,"/")}（${w}）チェック結果】`);
+  const fmt=(l,it)=>{const ty=tyOf(it),ev=effV(l.id,it,d),v=ev.v;let r;
+    if(ty==="check")r=v===true?"チェック済み":"未チェック";
+    else if(ty==="tri")r=v==="o"?"〇":v==="t"?"▲":v==="x"?"×":"未回答";
+    else if(ty==="num"){r=answered("num",v)?v+(it.unit||""):"未記入";const n=rawV(l.id,it.id+"~n",d)||(ev.auto?derivedNote(l.id,it,d):"");if(n)r+="（"+n+"）"}
+    else r=answered(ty,v)?String(v):"未記入";
+    return "・"+it.text+"："+r+(ev.auto?"（自動）":"")};
+  for(const l of L){const its=allItems(l);if(!its.length)continue;
+    const sl=slotOf(l),tri=its.filter(i=>tyOf(i)==="tri");
+    let head=`■${l.title}`;
+    if(tri.length){let sum=0,n=0,o=0,t=0,x=0;tri.forEach(i=>{const v=effV(l.id,i,d).v;if(v==="o"){o++;sum+=1;n++}else if(v==="t"){t++;sum+=.5;n++}else if(v==="x"){x++;n++}});
+      head+=n?`　採点 ${Math.round(sum/n*100)}点（〇${o} ▲${t} ×${x}／回答${n}件、未回答${tri.length-n}件は除外）目標80`:"　採点 未回答"}
+    else{const c=its.filter(i=>answered(tyOf(i),effV(l.id,i,d).v)).length;head+=`（${c}/${its.length}）`}
+    out.push("",head);
+    l.sections.forEach(s=>{if(!s.items.length)return;out.push("["+s.title+"]");s.items.forEach(it=>out.push(fmt(l,it)))});
+    const m=memoOf(l.id,d);if(m)out.push("メモ："+m.replace(/\n/g," "));
+  }
+  const done=Object.values(D.tdone||{}).filter(x=>x.date===d);
+  out.push("","■TODO");
+  out.push("本日完了："+(done.length?done.map(x=>x.text).join("、"):"なし"));
+  const rem=todoArr();out.push("残り："+(rem.length?rem.map((t,i)=>(i+1)+"."+t.text+(t.due?"（"+fmtDue(t.due)+"まで）":"")).join("　"):"なし"));
+  return out.join("\n");
 }
 function renderMain(){
   const l=cur(),M=$("main");
@@ -398,7 +477,9 @@ function renderMain(){
   h+=`<div class="tools"><button class="chip" data-act="only" aria-pressed="${S.onlyOpen}">未チェックのみ</button>
     <button class="chip" data-act="openall">詳細を${S.openDet.size?"閉じる":"すべて開く"}</button>
     <button class="chip" data-act="edit" aria-pressed="${S.edit}">${S.edit?"編集を終える":"編集"}</button>
+    ${slotOf(l)==="night"?`<button class="chip" data-act="report" aria-pressed="${!!S.showOut}">📋 出力</button>`:""}
     <button class="chip ${S.confirm==="reset"?"warn":""}" data-act="reset">${S.confirm==="reset"?"もう一度押すとリセット":"この日をリセット"}</button></div>`;
+  if(S.showOut&&slotOf(l)==="night")h+=`<div class="form" style="margin-top:12px"><div class="inl"><b style="font-size:.9rem">今日の結果（日記用テキスト）</b><span class="spacer"></span><button class="btn pri" data-act="rep-copy">コピー</button><button class="btn" data-act="report">閉じる</button></div><textarea class="outbox" id="outbox" readonly>${esc(buildReport(S.date))}</textarea></div>`;
   l.sections.forEach((s,si)=>{
     const n=s.items.filter(i=>isOn(l.id,i.id,S.date)).length,closed=S.collapsed.has(s.id)&&!S.edit;
     const body=s.items.map((it,i)=>itemHTML(l,s,it,i)).join("");
@@ -480,7 +561,7 @@ function applyOps(ops){
   for(const o of ops||[]){
     const t=o.no?arr[o.no-1]:null;
     if(o.op==="add"&&o.text){const id=uid("t");D.todos[id]={id,text:String(o.text).trim().slice(0,60),due:o.due||"",added:todayStr(),status:"",order:++maxO,updated:now};log.push("追加："+D.todos[id].text)}
-    else if((o.op==="done"||o.op==="delete")&&t&&D.todos[t.id]){D.tombs[t.id]=now;delete D.todos[t.id];log.push("完了："+t.text)}
+    else if((o.op==="done"||o.op==="delete")&&t&&D.todos[t.id]){D.tdone[t.id]={text:t.text,date:todayStr(),updated:now};D.tombs[t.id]=now;delete D.todos[t.id];log.push("完了："+t.text)}
     else if(o.op==="edit"&&t&&D.todos[t.id]){const x=D.todos[t.id];if(o.text)x.text=String(o.text).trim().slice(0,60);if(o.due)x.due=o.due;x.updated=now;log.push("変更："+x.text)}
   }
   if(log.length){pushHist(log.join("\n"),before);touchTodos()}
@@ -568,7 +649,7 @@ function renderMode(){
 function render(){renderTop();
   if(S.mode==="cal"){renderMode();renderCal();return}
   if(S.mode==="todo"){renderMode();if(!S.tBusy&&document.activeElement&&!/^(te-|g-key)/.test(document.activeElement.id||""))renderTodo();return}
-  renderSide();renderMode();if(S.editing)return;renderMain()}
+  renderSide();renderMode();if(S.editing)return;const ae=document.activeElement;if(ae&&ae.classList&&ae.classList.contains("vin")&&$("main").contains(ae))return;renderMain()}
 
 /* ---------- events ---------- */
 document.addEventListener("change",e=>{
@@ -576,7 +657,11 @@ document.addEventListener("change",e=>{
   if(el.dataset&&el.dataset.act==="check"){const l=cur();setCheck(l.id,el.dataset.item,el.checked);renderTop();
     if(S.onlyOpen)setTimeout(()=>{if(!S.editing)renderMain()},350);else renderMain();return}
   if(el.id==="bk-file")readBackup(el);
+  if(el.dataset&&(el.dataset.vitem||el.dataset.vnote)){flushV(el);renderTop();setTimeout(()=>{const ae=document.activeElement;if(!(ae&&ae.classList&&ae.classList.contains("vin")))renderMain()},0)}
 });
+const vT={};
+function flushV(el){const l=cur();if(!l)return;const id=el.dataset.vitem||(el.dataset.vnote+"~n");clearTimeout(vT[id]);const v=el.value.trim();if((rawV(l.id,id,S.date)||"")!==v)setVal(l.id,id,v)}
+document.addEventListener("input",e=>{const el=e.target;if(!el.dataset||!(el.dataset.vitem||el.dataset.vnote))return;const id=el.dataset.vitem||(el.dataset.vnote+"~n");clearTimeout(vT[id]);vT[id]=setTimeout(()=>{flushV(el);renderTop()},700)});
 document.addEventListener("keydown",e=>{if(e.target.id==="t-input"&&e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendTodo()}});
 document.addEventListener("toggle",e=>{const id=e.target.dataset&&e.target.dataset.det;if(!id)return;e.target.open?S.openDet.add(id):S.openDet.delete(id)},true);
 document.addEventListener("click",e=>{
@@ -590,7 +675,7 @@ document.addEventListener("click",e=>{
     case"next":if(S.date<t)S.date=addDays(S.date,1);break;
     case"today":S.date=t;break;
     case"jump":S.date=b.dataset.date;break;
-    case"tab":S.listId=b.dataset.list;LS.set("dc.list",S.listId);S.addingList=false;S.editing=null;break;
+    case"tab":S.listId=b.dataset.list;LS.set("dc.list",S.listId);LS.set("dc.man",{key:slotKey(),id:S.listId});S.addingList=false;S.editing=null;S.showOut=false;$("add-typebox").innerHTML="";break;
     case"addlist":S.addingList=true;S.editing=null;break;
     case"nl-cancel":S.addingList=false;break;
     case"gosettings":$("settings").scrollIntoView({behavior:"smooth"});return;
@@ -598,14 +683,17 @@ document.addEventListener("click",e=>{
     case"openall":if(S.openDet.size)S.openDet.clear();else allItems(l).forEach(i=>i.detail&&S.openDet.add(i.id));break;
     case"edit":S.edit=!S.edit;S.editing=null;break;
     case"sec":{const id=b.dataset.sec;S.collapsed.has(id)?S.collapsed.delete(id):S.collapsed.add(id);LS.set("dc.collapsed",[...S.collapsed]);break}
+    case"val":{const it=allItems(l).find(x=>x.id===b.dataset.item);if(!it)return;const cv=rawV(l.id,it.id,S.date),v=b.dataset.v;setVal(l.id,it.id,cv===v?null:v);renderTop();renderMain();return}
+    case"report":S.showOut=!S.showOut;break;
+    case"rep-copy":{const ta=$("outbox");const done=()=>toast("コピーしました");try{navigator.clipboard.writeText(ta.value).then(done,()=>{ta.select();document.execCommand("copy");done()})}catch(e){ta.select();document.execCommand("copy");done()}return}
     case"reset":if(S.confirm!=="reset"){S.confirm="reset";break}
-      allItems(l).forEach(i=>{if(isOn(l.id,i.id,S.date))setCheck(l.id,i.id,false)});S.confirm=null;toast("この日のチェックを外しました");break;
-    case"i-edit":{const[s,i]=findItem(b.dataset.item);const it=s.items[i];S.editing=it.id;S.draft={text:it.text,detail:it.detail||"",star:!!it.star};renderMain();const x=$("ed-text");x&&x.focus();return}
+      allItems(l).forEach(i=>{const c=checksOf(l.id,S.date);if(c[i.id]&&answered(tyOf(i),c[i.id][0]))setVal(l.id,i.id,tyOf(i)==="check"?false:null);if(c[i.id+"~n"]&&c[i.id+"~n"][0])setVal(l.id,i.id+"~n","")});S.confirm=null;toast("この日のチェックを外しました");break;
+    case"i-edit":{const[s,i]=findItem(b.dataset.item);const it=s.items[i];S.editing=it.id;S.draft={text:it.text,detail:it.detail||"",star:!!it.star,type:it.type,opts:it.opts,unit:it.unit,auto:it.auto};renderMain();const x=$("ed-text");x&&x.focus();return}
     case"i-cancel":S.editing=null;S.draft=null;break;
     case"i-save":{const[s,i]=findItem(b.dataset.item);const tx=$("ed-text").value.trim();if(!tx){toast("項目名を入れてください");return}
-      s.items[i]=Object.assign({},s.items[i],{text:tx,detail:$("ed-detail").value.replace(/\s+$/,""),star:$("ed-star").checked});S.editing=null;touchList(l);toast("保存しました");break}
+      const nt=readType("ed"),ni=Object.assign({},s.items[i],{text:tx,detail:$("ed-detail").value.replace(/\s+$/,""),star:$("ed-star").checked},nt);Object.keys(ni).forEach(k=>ni[k]===undefined&&delete ni[k]);s.items[i]=ni;S.editing=null;touchList(l);toast("保存しました");break}
     case"i-up":case"i-down":{const[s,i]=findItem(b.dataset.item);const j=a==="i-up"?i-1:i+1;if(j<0||j>=s.items.length)return;
-      S.draft={text:$("ed-text").value,detail:$("ed-detail").value,star:$("ed-star").checked};[s.items[i],s.items[j]]=[s.items[j],s.items[i]];touchList(l);renderMain();return}
+      S.draft=Object.assign({text:$("ed-text").value,detail:$("ed-detail").value,star:$("ed-star").checked},readType("ed"));[s.items[i],s.items[j]]=[s.items[j],s.items[i]];touchList(l);renderMain();return}
     case"i-del":if(S.confirm!=="i"+b.dataset.item){S.confirm="i"+b.dataset.item;renderMain();return}
       {const[s,i]=findItem(b.dataset.item);s.items.splice(i,1);S.editing=null;S.confirm=null;touchList(l);toast("削除しました")}break;
     case"s-save":{const s=findSec(b.dataset.sec),inp=[...document.querySelectorAll("[data-sec-title]")].find(x=>x.dataset.secTitle===b.dataset.sec),v=inp?inp.value.trim():"";if(v){s.title=v;touchList(l);toast("保存しました")}break}
@@ -629,14 +717,14 @@ document.addEventListener("click",e=>{
     case"t-open":S.tOpen=S.tOpen===b.dataset.id?null:b.dataset.id;renderTodo();return;
     case"t-save":{const x=D.todos[b.dataset.id];if(!x)return;const tx=$("te-text").value.trim();if(!tx){toast("TODOを入れてください");return}
       x.text=tx;x.due=$("te-due").value||"";x.status=$("te-st").value.trim();x.updated=Date.now();S.tOpen=null;touchTodos();toast("保存しました");renderTodo();return}
-    case"t-done":{const x=D.todos[b.dataset.id];if(!x)return;pushHist("完了："+x.text,JSON.stringify(D.todos));D.tombs[x.id]=Date.now();delete D.todos[x.id];S.tOpen=null;S.tMsg="";touchTodos();renderTodo();return}
+    case"t-done":{const x=D.todos[b.dataset.id];if(!x)return;pushHist("完了："+x.text,JSON.stringify(D.todos));D.tdone[x.id]={text:x.text,date:todayStr(),updated:Date.now()};D.tombs[x.id]=Date.now();delete D.todos[x.id];S.tOpen=null;S.tMsg="";touchTodos();renderTodo();return}
     case"t-up":case"t-down":{const arr=todoArr(),i=arr.findIndex(t=>t.id===b.dataset.id),j=a==="t-up"?i-1:i+1;if(j<0||j>=arr.length)return;
       const now=Date.now(),oi=arr[i].order,oj=arr[j].order;arr[i].order=oj;arr[j].order=oi;if(oi===oj){arr[i].order=j;arr[j].order=i}arr[i].updated=now;arr[j].updated=now;touchTodos();renderTodo();return}
     case"t-send":sendTodo();return;
     case"t-mic":startMic();return;
     case"t-undo":{const i=+b.dataset.i||0,hx=S.tHist[i];if(!hx)return;const prev=JSON.parse(hx.before),now=Date.now();
       for(const id in D.todos)if(!prev[id]){D.tombs[id]=now;delete D.todos[id]}
-      for(const id in prev){D.todos[id]=Object.assign({},prev[id],{updated:now});delete D.tombs[id]}
+      for(const id in prev){D.todos[id]=Object.assign({},prev[id],{updated:now});delete D.tombs[id];if(D.tdone[id])D.tdone[id]={text:D.tdone[id].text,date:"",updated:now}}
       S.tHist=S.tHist.slice(i+1);LS.set("dc.thist",S.tHist);S.tMsg="戻しました："+hx.label.split("\n")[0]+(hx.label.includes("\n")?" ほか":"");touchTodos();renderTodo();return}
     case"g-save":{const v=$("g-key").value.trim();if(!v){toast("キーを入力してください");return}D.settings.gemini={key:v,updated:Date.now()};LS.set("dc.gmodel","");touchTodos();toast("キーを保存しました");renderTodo();return}
     case"g-clear":D.settings.gemini={key:"",updated:Date.now()};touchTodos();toast("キーを消しました");renderTodo();return;
@@ -652,8 +740,8 @@ document.addEventListener("submit",e=>{
   e.preventDefault();
   if(e.target.id==="addform"){const l=cur(),s=l&&l.sections.find(x=>x.id===$("add-sec").value),tx=$("add-text").value.trim();
     if(!s){toast("先にセクションを作ってください");return}if(!tx)return;
-    s.items.push({id:uid("i"),text:tx,detail:$("add-detail").value.replace(/\s+$/,""),star:$("add-star").checked});
-    touchList(l);$("add-text").value="";$("add-detail").value="";$("add-star").checked=false;S.collapsed.delete(s.id);toast("「"+tx.slice(0,16)+"」を追加しました");render()}
+    const ni=Object.assign({id:uid("i"),text:tx,detail:$("add-detail").value.replace(/\s+$/,""),star:$("add-star").checked},readType("add"));Object.keys(ni).forEach(k=>ni[k]===undefined&&delete ni[k]);s.items.push(ni);
+    touchList(l);$("add-typebox").innerHTML="";$("add-text").value="";$("add-detail").value="";$("add-star").checked=false;S.collapsed.delete(s.id);toast("「"+tx.slice(0,16)+"」を追加しました");render()}
   if(e.target.id==="newlist"){const tx=$("nl-title").value.trim();if(!tx)return;
     const l={id:uid("l"),title:tx,subtitle:$("nl-sub").value.trim(),remind:$("nl-time").value||"",order:Date.now(),updated:0,sections:[{id:uid("s"),title:"チェック",items:[]}]};
     S.listId=l.id;LS.set("dc.list",l.id);S.addingList=false;touchList(l);render()}
@@ -677,10 +765,19 @@ function readBackup(el){
 function applyBackup(){if(!pending)return;mergeData(pending);pending=null;$("bk-apply").hidden=true;$("bk-note").textContent="読み込みました";schedulePush();pushNative();render()}
 
 /* ---------- lifecycle ---------- */
+function slotNow(){const h=new Date().getHours();return h<11?"morning":h<17?"noon":"night"}
+const slotKey=()=>todayStr()+"/"+slotNow();
+let lastSlotKey="";
+function autoPick(force){const k=slotKey();if(!force&&k===lastSlotKey)return false;lastSlotKey=k;
+  const man=LS.get("dc.man",null);if(man&&man.key===k&&D.lists[man.id])return false;
+  const l=listsArr().find(x=>slotOf(x)===slotNow());if(!l)return false;
+  if(S.listId!==l.id||S.date!==todayStr()){S.listId=l.id;S.date=todayStr();S.showOut=false;S.editing=null;const tb=$("add-typebox");if(tb)tb.innerHTML="";return true}return false}
 let lastToday=todayStr();
-function rollover(){const t=todayStr();if(t!==lastToday){if(S.date===lastToday)S.date=t;lastToday=t;render();pushNative()}}
+function rollover(){const t=todayStr();let ch=false;if(t!==lastToday){if(S.date===lastToday)S.date=t;lastToday=t;ch=true}if(S.mode==="check"&&!S.editing&&autoPick(false))ch=true;if(ch){render();pushNative()}}
 setInterval(rollover,60000);
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){rollover();sync()}});
+let hiddenAt=0;
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){hiddenAt=Date.now();return}
+  if(Date.now()-hiddenAt>10*60000&&!S.editing&&autoPick(true)){S.mode="check";render()}rollover();sync()});
 window.addEventListener("online",()=>sync());
 window.addEventListener("storage",e=>{if(e.key==="dc.data"&&e.newValue){try{D=JSON.parse(e.newValue);render()}catch(_){}}});
 $("ghToken").value=gh.token?"（設定済み）":"";
@@ -688,7 +785,7 @@ $("ghToken").addEventListener("focus",e=>{if(e.target.value==="（設定済み�
 $("ver").textContent="v"+VER+(N?"（アプリ版）":"");
 $("nativebox").hidden=!N;
 if(gh.token){setSync("同期待ち");setTimeout(sync,300)}
-render();pushNative();
+autoPick(true);render();pushNative();
 if("serviceWorker" in navigator&&location.protocol==="https:"){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 window.__dcTest={get D(){return D},sync,mergeData,setCheck,S};
 })();
