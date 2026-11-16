@@ -45,6 +45,15 @@ button{cursor:pointer;background:none;border:0;padding:0}
 .tab{white-space:nowrap;padding:5px 12px;border-radius:999px;border:1px solid var(--line);font-size:.85rem;background:var(--surface)}
 .tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--onacc)}
 .tab.add{color:var(--muted);border-style:dashed}
+.tab.edit{color:#2f4f8f;font-weight:600;position:sticky;right:0;box-shadow:-8px 0 8px var(--bg,#f3f2ef)}
+.tab.edit[aria-pressed="true"]{background:#2f4f8f;color:#fff;border-color:#2f4f8f}
+.eitem .einl{display:flex;gap:6px;align-items:center}
+.eitem .ein{flex:1;min-width:0}
+.eitem .btn{padding:6px 10px;flex:none}
+.eitem .emore{margin-top:6px}
+.eitem .emore summary{font-size:.8rem;color:var(--muted);cursor:pointer}
+.eitem .emore .in,.eitem .emore label{margin-top:6px;display:block}
+.ehint{font-size:.8rem;color:var(--muted);margin:10px 0 0}
 .prog{display:flex;align-items:center;gap:10px;margin-top:10px}
 .bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--done);transition:width .25s}
@@ -248,7 +257,7 @@ const SEED2=[{"id": "asa", "title": "朝の確認チェック", "subtitle": "6:3
 
 (function(){
 "use strict";
-const VER="1.4.1", GOAL=0.8;
+const VER="1.5.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -272,7 +281,7 @@ const TSEED=[["免許証更新","更新期限・手続き方法を確認","2026-
 if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id])D.todos[id]={id,text:t[0],due:"",added:t[2],status:"",order:i+1,updated:1}})}
 D.settings=D.settings||{};D.tdone=D.tdone||{};
 SEED2.forEach(x=>{if(!D.lists[x.id]&&!D.tombs[x.id])D.lists[x.id]=clone(x)});
-const S={listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
+const S={eOpen:new Set(),listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
   collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tHist:LS.get("dc.thist",[]),tMsg:"",tBusy:false};
 function pushHist(label,before){const d=new Date();S.tHist.unshift({label,before,tm:(d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+":"+pad(d.getMinutes())});S.tHist=S.tHist.slice(0,5);LS.set("dc.thist",S.tHist)}
 
@@ -394,7 +403,7 @@ function renderTop(){
   const t=todayStr(),d=S.date,l=cur();
   $("date").innerHTML=`${esc(d.slice(5).replace("-","/"))}（${wd(d)}）<small>${d===t?"今日":esc(d.slice(0,4))}</small>`;
   $("next").disabled=d>=t;$("todaybtn").hidden=d===t;
-  $("tabs").innerHTML=listsArr().map(x=>`<button class="tab" data-act="tab" data-list="${esc(x.id)}" aria-pressed="${!!l&&l.id===x.id}">${esc(x.title)}</button>`).join("")+`<button class="tab add" data-act="addlist">＋ リスト</button>`;
+  $("tabs").innerHTML=listsArr().map(x=>`<button class="tab" data-act="tab" data-list="${esc(x.id)}" aria-pressed="${!!l&&l.id===x.id}">${esc(x.title)}</button>`).join("")+`<button class="tab add" data-act="addlist">＋ リスト</button>`+(l?`<button class="tab edit" data-act="edit" aria-pressed="${S.edit}">${S.edit?"✓ 編集完了":"✎ 編集"}</button>`:"");
   const it=allItems(l),n=l?it.filter(i=>isOn(l.id,i.id,d)).length:0;
   $("barfill").style.width=(it.length?n/it.length*100:0)+"%";
   $("pct").textContent=`${n} / ${it.length}　${it.length?Math.round(n/it.length*100):0}%`;
@@ -417,6 +426,15 @@ function itemHTML(l,s,it,i){
       <button class="btn" type="button" data-act="i-down" data-item="${esc(it.id)}" ${i===s.items.length-1?"disabled":""}>↓</button></div>
     <div class="inl"><button class="btn del" type="button" data-act="i-del" data-item="${esc(it.id)}">${S.confirm==="i"+it.id?"もう一度押すと削除":"削除"}</button><span class="spacer"></span>
       <button class="btn" type="button" data-act="i-cancel">やめる</button><button class="btn pri" type="button" data-act="i-save" data-item="${esc(it.id)}">保存</button></div></div></li>`}
+  if(S.edit){const id=esc(it.id),t=it.type||"check";return `<li class="item eitem"><div class="einl"><input class="in ein" type="text" data-ef="text" data-item="${id}" value="${esc(it.text)}">
+    <button class="btn" type="button" data-act="i-up" data-item="${id}" ${i===0?"disabled":""}>↑</button><button class="btn" type="button" data-act="i-down" data-item="${id}" ${i===s.items.length-1?"disabled":""}>↓</button>
+    <button class="btn del" type="button" data-act="i-del" data-item="${id}">${S.confirm==="i"+it.id?"本当に削除":"削除"}</button></div>
+    <details class="emore" data-eo="${id}" ${S.eOpen.has(it.id)?"open":""}><summary>詳細・種類・★${it.detail?"（詳細あり）":""}</summary>
+    <textarea class="in" data-ef="detail" data-item="${id}" placeholder="詳細（折りたたみ表示）">${esc(it.detail||"")}</textarea>
+    <div class="inl"><label style="flex:1;min-width:8em">種類<select class="in" data-ef="type" data-item="${id}"><option value="check" ${t==="check"?"selected":""}>チェック</option><option value="tri" ${t==="tri"?"selected":""}>〇▲×</option><option value="choice" ${t==="choice"?"selected":""}>選択肢</option><option value="num" ${t==="num"?"selected":""}>数値</option><option value="text" ${t==="text"?"selected":""}>1行メモ</option></select></label>
+    <label style="flex:2;min-width:10em">選択肢（カンマ区切り）／単位<input class="in" data-ef="opts" data-item="${id}" value="${esc(t==="num"?(it.unit||""):(it.opts||[]).join(","))}"></label></div>
+    <label>連動キーワード<input class="in" data-ef="auto" data-item="${id}" value="${esc(it.auto||"")}" placeholder="例：瞑想"></label>
+    <label class="ck"><input type="checkbox" data-ef="star" data-item="${id}" ${it.star?"checked":""}> ★重要</label></details></li>`}
   if(S.onlyOpen&&on&&!S.edit)return "";
   const label=`<span class="txt">${it.star?'<span class="star">★</span>':""}${esc(it.text)}</span>`,eb=S.edit?`<button class="ebtn" data-act="i-edit" data-item="${esc(it.id)}">編集</button>`:"";
   const det=it.detail?`<details data-det="${esc(it.id)}" ${S.openDet.has(it.id)?"open":""}><summary>詳細</summary><div class="detail">${esc(it.detail)}</div></details>`:"";
@@ -473,11 +491,11 @@ function renderMain(){
   if(S.edit){h+=`<div class="form" style="margin-top:16px"><label>リスト名<input class="in" type="text" id="l-title" value="${esc(l.title)}"></label>
     <label>説明<input class="in" type="text" id="l-sub" value="${esc(l.subtitle||"")}"></label>
     <label>通知時刻（アプリ版・空欄で通知なし）<input class="in" type="time" id="l-time" value="${esc(l.remind||"")}"></label>
-    <div class="inl"><button class="btn del" type="button" data-act="l-del">${S.confirm==="l"?"もう一度押すとリストごと削除":"リストを削除"}</button><span class="spacer"></span><button class="btn pri" type="button" data-act="l-save">保存</button></div></div>`}
+    <div class="inl"><button class="btn del" type="button" data-act="l-del">${S.confirm==="l"?"もう一度押すとリストごと削除":"リストを削除"}</button></div><p class="ehint">入力するとその場で保存されます。終わったら「✓ 編集完了」。</p></div>`}
   else h+=`<div class="listhead"><h1>${esc(l.title)}</h1>${l.subtitle||l.remind?`<p>${esc(l.subtitle||"")}${l.remind?`　🔔 ${esc(l.remind)}`:""}</p>`:""}</div>`;
   h+=`<div class="tools"><button class="chip" data-act="only" aria-pressed="${S.onlyOpen}">未チェックのみ</button>
     <button class="chip" data-act="openall">詳細を${S.openDet.size?"閉じる":"すべて開く"}</button>
-    <button class="chip" data-act="edit" aria-pressed="${S.edit}">${S.edit?"編集を終える":"編集"}</button>
+    <button class="chip" data-act="edit" aria-pressed="${S.edit}">${S.edit?"✓ 編集完了":"✎ 編集"}</button>
     ${slotOf(l)==="night"?`<button class="chip" data-act="report" aria-pressed="${!!S.showOut}">📋 出力</button>`:""}
     <button class="chip ${S.confirm==="reset"?"warn":""}" data-act="reset">${S.confirm==="reset"?"もう一度押すとリセット":"この日をリセット"}</button></div>`;
   if(S.showOut&&slotOf(l)==="night")h+=`<div class="form" style="margin-top:12px"><div class="inl"><b style="font-size:.9rem">今日の結果（日記用テキスト）</b><span class="spacer"></span><button class="btn pri" data-act="rep-copy">コピー</button><button class="btn" data-act="report">閉じる</button></div><textarea class="outbox" id="outbox" readonly>${esc(buildReport(S.date))}</textarea></div>`;
@@ -487,8 +505,7 @@ function renderMain(){
     h+=`<section class="sec ${closed?"closed":""}">`;
     if(S.edit){h+=`<div class="form"><label>セクション名<input class="in" type="text" data-sec-title="${esc(s.id)}" value="${esc(s.title)}"></label>
       <div class="inl"><button class="btn" data-act="s-up" data-sec="${esc(s.id)}" ${si===0?"disabled":""}>↑</button><button class="btn" data-act="s-down" data-sec="${esc(s.id)}" ${si===l.sections.length-1?"disabled":""}>↓</button>
-      <button class="btn del" data-act="s-del" data-sec="${esc(s.id)}">${S.confirm==="s"+s.id?"もう一度押すと項目ごと削除":"削除"}</button><span class="spacer"></span>
-      <button class="btn pri" data-act="s-save" data-sec="${esc(s.id)}">名前を保存</button></div></div>`}
+      <button class="btn del" data-act="s-del" data-sec="${esc(s.id)}">${S.confirm==="s"+s.id?"もう一度押すと項目ごと削除":"削除"}</button></div></div>`}
     else h+=`<button class="sechead" data-act="sec" data-sec="${esc(s.id)}" aria-expanded="${!closed}"><span class="idx num">${si}</span><h2>${esc(s.title)}</h2><span class="cnt num ${n===s.items.length&&n?"full":""}">${n}/${s.items.length}</span><span class="car">▾</span></button>`;
     if(!closed)h+=`<ul class="items">${body||(S.onlyOpen&&s.items.length?'<li class="item" style="color:var(--muted);font-size:.85rem">すべてチェック済み</li>':"")}</ul>`;
     h+=`</section>`;
@@ -651,7 +668,7 @@ function renderMode(){
 function render(){renderTop();
   if(S.mode==="cal"){renderMode();renderCal();return}
   if(S.mode==="todo"){renderMode();if(!S.tBusy&&document.activeElement&&!/^(te-|g-key)/.test(document.activeElement.id||""))renderTodo();return}
-  renderSide();renderMode();if(S.editing)return;const ae=document.activeElement;if(ae&&ae.classList&&ae.classList.contains("vin")&&$("main").contains(ae))return;renderMain()}
+  renderSide();renderMode();if(S.editing)return;const ae=document.activeElement;if(ae&&ae.classList&&$("main").contains(ae)&&(ae.classList.contains("vin")||(S.edit&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&ae.type!=="checkbox")))return;renderMain()}
 
 /* ---------- events ---------- */
 document.addEventListener("change",e=>{
@@ -665,7 +682,7 @@ const vT={};
 function flushV(el){const l=cur();if(!l)return;const id=el.dataset.vitem||(el.dataset.vnote+"~n");clearTimeout(vT[id]);const v=el.value.trim();if((rawV(l.id,id,S.date)||"")!==v)setVal(l.id,id,v)}
 document.addEventListener("input",e=>{const el=e.target;if(!el.dataset||!(el.dataset.vitem||el.dataset.vnote))return;const id=el.dataset.vitem||(el.dataset.vnote+"~n");clearTimeout(vT[id]);vT[id]=setTimeout(()=>{flushV(el);renderTop()},700)});
 document.addEventListener("keydown",e=>{if(e.target.id==="t-input"&&e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendTodo()}});
-document.addEventListener("toggle",e=>{const id=e.target.dataset&&e.target.dataset.det;if(!id)return;e.target.open?S.openDet.add(id):S.openDet.delete(id)},true);
+document.addEventListener("toggle",e=>{const eo=e.target.dataset&&e.target.dataset.eo;if(eo){e.target.open?S.eOpen.add(eo):S.eOpen.delete(eo);return}const id=e.target.dataset&&e.target.dataset.det;if(!id)return;e.target.open?S.openDet.add(id):S.openDet.delete(id)},true);
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");if(!b||b.dataset.act==="check")return;
   const a=b.dataset.act,l=cur(),t=todayStr();
@@ -677,13 +694,13 @@ document.addEventListener("click",e=>{
     case"next":if(S.date<t)S.date=addDays(S.date,1);break;
     case"today":S.date=t;break;
     case"jump":S.date=b.dataset.date;break;
-    case"tab":S.listId=b.dataset.list;LS.set("dc.list",S.listId);LS.set("dc.man",{key:slotKey(),id:S.listId});S.addingList=false;S.editing=null;S.showOut=false;$("add-typebox").innerHTML="";break;
+    case"tab":flushE();S.listId=b.dataset.list;LS.set("dc.list",S.listId);LS.set("dc.man",{key:slotKey(),id:S.listId});S.addingList=false;S.editing=null;S.showOut=false;$("add-typebox").innerHTML="";break;
     case"addlist":S.addingList=true;S.editing=null;break;
     case"nl-cancel":S.addingList=false;break;
     case"gosettings":$("settings").scrollIntoView({behavior:"smooth"});return;
     case"only":S.onlyOpen=!S.onlyOpen;LS.set("dc.only",S.onlyOpen);break;
     case"openall":if(S.openDet.size)S.openDet.clear();else allItems(l).forEach(i=>i.detail&&S.openDet.add(i.id));break;
-    case"edit":S.edit=!S.edit;S.editing=null;break;
+    case"edit":if(S.edit){flushE();toast("編集を完了しました")}S.edit=!S.edit;S.editing=null;S.confirm=null;scrollTo(0,0);break;
     case"sec":{const id=b.dataset.sec;S.collapsed.has(id)?S.collapsed.delete(id):S.collapsed.add(id);LS.set("dc.collapsed",[...S.collapsed]);break}
     case"val":{const it=allItems(l).find(x=>x.id===b.dataset.item);if(!it)return;const cv=rawV(l.id,it.id,S.date),v=b.dataset.v;setVal(l.id,it.id,cv===v?null:v);renderTop();renderMain();return}
     case"report":S.showOut=!S.showOut;break;
@@ -695,7 +712,7 @@ document.addEventListener("click",e=>{
     case"i-save":{const[s,i]=findItem(b.dataset.item);const tx=$("ed-text").value.trim();if(!tx){toast("項目名を入れてください");return}
       const nt=readType("ed"),ni=Object.assign({},s.items[i],{text:tx,detail:$("ed-detail").value.replace(/\s+$/,""),star:$("ed-star").checked},nt);Object.keys(ni).forEach(k=>ni[k]===undefined&&delete ni[k]);s.items[i]=ni;S.editing=null;touchList(l);toast("保存しました");break}
     case"i-up":case"i-down":{const[s,i]=findItem(b.dataset.item);const j=a==="i-up"?i-1:i+1;if(j<0||j>=s.items.length)return;
-      S.draft=Object.assign({text:$("ed-text").value,detail:$("ed-detail").value,star:$("ed-star").checked},readType("ed"));[s.items[i],s.items[j]]=[s.items[j],s.items[i]];touchList(l);renderMain();return}
+      if(S.editing&&$("ed-text"))S.draft=Object.assign({text:$("ed-text").value,detail:$("ed-detail").value,star:$("ed-star").checked},readType("ed"));flushE();[s.items[i],s.items[j]]=[s.items[j],s.items[i]];touchList(l);renderMain();return}
     case"i-del":if(S.confirm!=="i"+b.dataset.item){S.confirm="i"+b.dataset.item;renderMain();return}
       {const[s,i]=findItem(b.dataset.item);s.items.splice(i,1);S.editing=null;S.confirm=null;touchList(l);toast("削除しました")}break;
     case"s-save":{const s=findSec(b.dataset.sec),inp=[...document.querySelectorAll("[data-sec-title]")].find(x=>x.dataset.secTitle===b.dataset.sec),v=inp?inp.value.trim():"";if(v){s.title=v;touchList(l);toast("保存しました")}break}
@@ -738,6 +755,24 @@ document.addEventListener("input",e=>{
   if(e.target.id==="memo"){const l=cur();if(!l)return;setMemo(l.id,e.target.value);$("memonote").textContent="保存しました"}
   if(S.editing&&S.draft){if(e.target.id==="ed-text")S.draft.text=e.target.value;if(e.target.id==="ed-detail")S.draft.detail=e.target.value}
 });
+/* live edit */
+let eT=null,eL=null;
+function flushE(){if(eT){clearTimeout(eT);eT=null;if(eL)touchList(eL);eL=null}}
+function queueE(l){eL=l;clearTimeout(eT);eT=setTimeout(()=>{eT=null;touchList(l);eL=null;renderTop()},600)}
+function applyE(el){const l=cur();if(!l||!S.edit)return false;
+  if(el.dataset.ef){const id=el.dataset.item;let s,i=-1;for(const x of l.sections){i=x.items.findIndex(y=>y.id===id);if(i>=0){s=x;break}}if(!s)return false;
+    const li=el.closest("li"),q=f=>li.querySelector(`[data-ef="${f}"]`),it=Object.assign({},s.items[i]),tx=q("text").value.trim();
+    if(tx)it.text=tx;it.detail=q("detail").value.replace(/\s+$/,"");it.star=q("star").checked;
+    const ty=q("type").value,o=q("opts").value.trim(),au=q("auto").value.trim();
+    it.type=ty==="check"?undefined:ty;it.auto=au||undefined;it.opts=ty==="choice"?o.split(/[,、，]/).map(x=>x.trim()).filter(Boolean):undefined;it.unit=ty==="num"?o:undefined;
+    if(!it.detail)delete it.detail;if(!it.star)delete it.star;Object.keys(it).forEach(k=>it[k]===undefined&&delete it[k]);s.items[i]=it;queueE(l);return true}
+  if(el.dataset.secTitle!==undefined){const s=l.sections.find(x=>x.id===el.dataset.secTitle),v=el.value.trim();if(s&&v){s.title=v;queueE(l)}return true}
+  if(el.id==="l-title"||el.id==="l-sub"||el.id==="l-time"){const v=$("l-title").value.trim();if(v)l.title=v;l.subtitle=$("l-sub").value.trim();l.remind=$("l-time").value||"";queueE(l);return true}
+  return false}
+document.addEventListener("input",e=>{if(e.target.type!=="checkbox")applyE(e.target)});
+document.addEventListener("change",e=>{if(applyE(e.target)&&(e.target.dataset.ef==="star"||e.target.id==="l-time"))flushE()});
+window.addEventListener("pagehide",flushE);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)flushE()});
 document.addEventListener("submit",e=>{
   e.preventDefault();
   if(e.target.id==="addform"){const l=cur(),s=l&&l.sections.find(x=>x.id===$("add-sec").value),tx=$("add-text").value.trim();
