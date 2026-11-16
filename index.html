@@ -53,6 +53,11 @@ button{cursor:pointer;background:none;border:0;padding:0}
 .eitem .emore{margin-top:6px}
 .eitem .emore summary{font-size:.8rem;color:var(--muted);cursor:pointer}
 .eitem .emore .in,.eitem .emore label{margin-top:6px;display:block}
+.tyw[data-t="time"] .optlab{display:none}
+.tyw:not([data-t="time"]) .tmbox{display:none}
+.tmbox{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;margin-top:8px}
+.tmbox .tmh{font-size:.8rem;color:var(--muted);width:100%}
+.tmbox .ck{display:inline-flex!important;margin-top:0!important}
 .ehint{font-size:.8rem;color:var(--muted);margin:10px 0 0}
 .prog{display:flex;align-items:center;gap:10px;margin-top:10px}
 .bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
@@ -257,7 +262,7 @@ const SEED2=[{"id": "asa", "title": "朝の確認チェック", "subtitle": "6:3
 
 (function(){
 "use strict";
-const VER="1.5.0", GOAL=0.8;
+const VER="1.6.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -431,9 +436,7 @@ function itemHTML(l,s,it,i){
     <button class="btn del" type="button" data-act="i-del" data-item="${id}">${S.confirm==="i"+it.id?"本当に削除":"削除"}</button></div>
     <details class="emore" data-eo="${id}" ${S.eOpen.has(it.id)?"open":""}><summary>詳細・種類・★${it.detail?"（詳細あり）":""}</summary>
     <textarea class="in" data-ef="detail" data-item="${id}" placeholder="詳細（折りたたみ表示）">${esc(it.detail||"")}</textarea>
-    <div class="inl"><label style="flex:1;min-width:8em">種類<select class="in" data-ef="type" data-item="${id}"><option value="check" ${t==="check"?"selected":""}>チェック</option><option value="tri" ${t==="tri"?"selected":""}>〇▲×</option><option value="choice" ${t==="choice"?"selected":""}>選択肢</option><option value="num" ${t==="num"?"selected":""}>数値</option><option value="text" ${t==="text"?"selected":""}>1行メモ</option></select></label>
-    <label style="flex:2;min-width:10em">選択肢（カンマ区切り）／単位<input class="in" data-ef="opts" data-item="${id}" value="${esc(t==="num"?(it.unit||""):(it.opts||[]).join(","))}"></label></div>
-    <label>連動キーワード<input class="in" data-ef="auto" data-item="${id}" value="${esc(it.auto||"")}" placeholder="例：瞑想"></label>
+    ${tyUI(f=>`data-ef="${f}" data-item="${id}"`,it)}
     <label class="ck"><input type="checkbox" data-ef="star" data-item="${id}" ${it.star?"checked":""}> ★重要</label></details></li>`}
   if(S.onlyOpen&&on&&!S.edit)return "";
   const label=`<span class="txt">${it.star?'<span class="star">★</span>':""}${esc(it.text)}</span>`,eb=S.edit?`<button class="ebtn" data-act="i-edit" data-item="${esc(it.id)}">編集</button>`:"";
@@ -447,11 +450,18 @@ function itemHTML(l,s,it,i){
   else{const own=rawV(l.id,it.id,S.date);body=`<div class="vrow">${label}${eb}</div><input class="vin wide" type="text" data-vitem="${esc(it.id)}" value="${esc(answered("text",own)?own:"")}" placeholder="${ev.auto?esc(ev.v):"記入"}">${ev.auto?'<p class="autonote">朝の入力から自動反映（入力すると上書き）</p>':""}`}
   return `<li class="item">${body}${det}</li>`;
 }
-function typeFields(p,D2){const t=D2.type||"check";return `<div class="inl"><label style="flex:1;min-width:8em">種類<select class="in" id="${p}-type"><option value="check" ${t==="check"?"selected":""}>チェック</option><option value="tri" ${t==="tri"?"selected":""}>〇▲×</option><option value="choice" ${t==="choice"?"selected":""}>選択肢</option><option value="num" ${t==="num"?"selected":""}>数値</option><option value="text" ${t==="text"?"selected":""}>1行メモ</option></select></label>
-  <label style="flex:2;min-width:10em">選択肢（カンマ区切り）／単位<input class="in" id="${p}-opts" value="${esc(t==="num"?(D2.unit||""):(D2.opts||[]).join(","))}" placeholder="例：2H,1.5H,1H　／　h"></label></div>
-  <label>連動キーワード（他のリストでこの言葉を含む項目にチェックがあれば自動反映）<input class="in" id="${p}-auto" value="${esc(D2.auto||"")}" placeholder="例：瞑想"></label>`}
-function readType(p){const type=$(p+"-type").value,o=$(p+"-opts").value.trim(),auto=$(p+"-auto").value.trim();const r={type:type==="check"?undefined:type,auto:auto||undefined,opts:undefined,unit:undefined};
+const TIMES=["2H","1.5H","1H","0.5H","0H"],TLAB={"2H":"2時間","1.5H":"1.5時間","1H":"1時間","0.5H":"0.5時間","0H":"0時間"};
+function uiTy(D2){const t=D2.type||"check",o=D2.opts||[];return t==="choice"&&o.length&&o.every(x=>TIMES.includes(x))?"time":t}
+function tyUI(a,D2){const t=uiTy(D2),sel=v=>t===v?"selected":"",on=t==="time"?(D2.opts||[]):TIMES;
+  return `<div class="tyw" data-t="${t}"><div class="inl"><label style="flex:1;min-width:8em">種類<select class="in" ${a("type")}><option value="check" ${sel("check")}>チェック</option><option value="tri" ${sel("tri")}>〇▲×</option><option value="time" ${sel("time")}>時間選択</option><option value="choice" ${sel("choice")}>選択肢</option><option value="num" ${sel("num")}>数値</option><option value="text" ${sel("text")}>1行メモ</option></select></label>
+  <label class="optlab" style="flex:2;min-width:10em">選択肢（カンマ区切り）／単位<input class="in" ${a("opts")} value="${esc(t==="num"?(D2.unit||""):t==="choice"?(D2.opts||[]).join(","):"")}" placeholder="例：A,B,C　／　回"></label></div>
+  <div class="tmbox"><span class="tmh">表示する時間</span>${TIMES.map(v=>`<label class="ck"><input type="checkbox" ${a("tm")} value="${v}" ${on.includes(v)?"checked":""}> ${TLAB[v]}</label>`).join("")}</div>
+  <label>連動キーワード（他のリストでこの言葉を含む項目にチェックがあれば自動反映）<input class="in" ${a("auto")} value="${esc(D2.auto||"")}" placeholder="例：瞑想"></label></div>`}
+function readTy(root,q){const type=q("type").value,o=(q("opts").value||"").trim(),au=q("auto").value.trim(),r={type:type==="check"?undefined:type,auto:au||undefined,opts:undefined,unit:undefined};
+  if(type==="time"){r.type="choice";const c=[...root.querySelectorAll('input[value][type=checkbox]')].filter(x=>TIMES.includes(x.value)&&x.checked).map(x=>x.value);r.opts=c.length?c:TIMES.slice()}
   if(type==="choice")r.opts=o.split(/[,、，]/).map(x=>x.trim()).filter(Boolean);if(type==="num")r.unit=o;return r}
+function typeFields(p,D2){return `<div id="${p}-tyroot">${tyUI(f=>f==="tm"?`data-tm="${p}"`:`id="${p}-${f}"`,D2)}</div>`}
+function readType(p){return readTy($(p+"-tyroot"),f=>$(p+"-"+f))}
 /* ---------- night report ---------- */
 function buildReport(d){
   const L=listsArr(),out=[],w=wd(d);out.push(`【${d.replace(/-/g,"/")}（${w}）チェック結果】`);
@@ -505,7 +515,7 @@ function renderMain(){
     h+=`<section class="sec ${closed?"closed":""}">`;
     if(S.edit){h+=`<div class="form"><label>セクション名<input class="in" type="text" data-sec-title="${esc(s.id)}" value="${esc(s.title)}"></label>
       <div class="inl"><button class="btn" data-act="s-up" data-sec="${esc(s.id)}" ${si===0?"disabled":""}>↑</button><button class="btn" data-act="s-down" data-sec="${esc(s.id)}" ${si===l.sections.length-1?"disabled":""}>↓</button>
-      <button class="btn del" data-act="s-del" data-sec="${esc(s.id)}">${S.confirm==="s"+s.id?"もう一度押すと項目ごと削除":"削除"}</button></div></div>`}
+      <button class="btn del" data-act="s-del" data-sec="${esc(s.id)}">${S.confirm==="s"+s.id?"もう一度押すと項目ごと削除":"削除"}</button><span class="spacer"></span><button class="btn pri" data-act="s-additem" data-sec="${esc(s.id)}">＋ 項目を追加</button></div></div>`}
     else h+=`<button class="sechead" data-act="sec" data-sec="${esc(s.id)}" aria-expanded="${!closed}"><span class="idx num">${si}</span><h2>${esc(s.title)}</h2><span class="cnt num ${n===s.items.length&&n?"full":""}">${n}/${s.items.length}</span><span class="car">▾</span></button>`;
     if(!closed)h+=`<ul class="items">${body||(S.onlyOpen&&s.items.length?'<li class="item" style="color:var(--muted);font-size:.85rem">すべてチェック済み</li>':"")}</ul>`;
     h+=`</section>`;
@@ -719,6 +729,8 @@ document.addEventListener("click",e=>{
     case"s-up":case"s-down":{const i=l.sections.findIndex(s=>s.id===b.dataset.sec),j=a==="s-up"?i-1:i+1;if(j<0||j>=l.sections.length)return;[l.sections[i],l.sections[j]]=[l.sections[j],l.sections[i]];touchList(l);break}
     case"s-del":if(S.confirm!=="s"+b.dataset.sec){S.confirm="s"+b.dataset.sec;break}
       l.sections=l.sections.filter(s=>s.id!==b.dataset.sec);S.confirm=null;touchList(l);toast("セクションを削除しました");break;
+    case"s-additem":{flushE();const sc=findSec(b.dataset.sec);if(!sc)return;const ni={id:uid("i"),text:"新しい項目"};if(slotOf(l)==="night")ni.type="tri";sc.items.push(ni);touchList(l);renderMain();
+      const x=document.querySelector(`input[data-ef="text"][data-item="${ni.id}"]`);if(x){x.scrollIntoView({block:"center"});x.focus();x.select()}return}
     case"s-add":{const v=$("new-sec").value.trim();if(!v){toast("セクション名を入れてください");return}l.sections.push({id:uid("s"),title:v,items:[]});touchList(l);break}
     case"l-save":{const v=$("l-title").value.trim();if(!v)return;l.title=v;l.subtitle=$("l-sub").value.trim();l.remind=$("l-time").value||"";touchList(l);toast("保存しました");break}
     case"l-del":if(S.confirm!=="l"){S.confirm="l";break}
@@ -763,14 +775,13 @@ function applyE(el){const l=cur();if(!l||!S.edit)return false;
   if(el.dataset.ef){const id=el.dataset.item;let s,i=-1;for(const x of l.sections){i=x.items.findIndex(y=>y.id===id);if(i>=0){s=x;break}}if(!s)return false;
     const li=el.closest("li"),q=f=>li.querySelector(`[data-ef="${f}"]`),it=Object.assign({},s.items[i]),tx=q("text").value.trim();
     if(tx)it.text=tx;it.detail=q("detail").value.replace(/\s+$/,"");it.star=q("star").checked;
-    const ty=q("type").value,o=q("opts").value.trim(),au=q("auto").value.trim();
-    it.type=ty==="check"?undefined:ty;it.auto=au||undefined;it.opts=ty==="choice"?o.split(/[,、，]/).map(x=>x.trim()).filter(Boolean):undefined;it.unit=ty==="num"?o:undefined;
+    Object.assign(it,readTy(li.querySelector(".tyw"),q));
     if(!it.detail)delete it.detail;if(!it.star)delete it.star;Object.keys(it).forEach(k=>it[k]===undefined&&delete it[k]);s.items[i]=it;queueE(l);return true}
   if(el.dataset.secTitle!==undefined){const s=l.sections.find(x=>x.id===el.dataset.secTitle),v=el.value.trim();if(s&&v){s.title=v;queueE(l)}return true}
   if(el.id==="l-title"||el.id==="l-sub"||el.id==="l-time"){const v=$("l-title").value.trim();if(v)l.title=v;l.subtitle=$("l-sub").value.trim();l.remind=$("l-time").value||"";queueE(l);return true}
   return false}
 document.addEventListener("input",e=>{if(e.target.type!=="checkbox")applyE(e.target)});
-document.addEventListener("change",e=>{if(applyE(e.target)&&(e.target.dataset.ef==="star"||e.target.id==="l-time"))flushE()});
+document.addEventListener("change",e=>{const el=e.target;if(el.tagName==="SELECT"&&el.closest(".tyw"))el.closest(".tyw").dataset.t=el.value;if(applyE(el)&&(el.type==="checkbox"||el.tagName==="SELECT"||el.id==="l-time"))flushE()});
 window.addEventListener("pagehide",flushE);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)flushE()});
 document.addEventListener("submit",e=>{
