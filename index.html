@@ -160,6 +160,16 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .cell .ok{margin-top:auto;align-self:center;width:24px;height:24px;border-radius:50%;background:var(--done);display:grid;place-items:center}
 .cell .ok::after{content:"";width:5px;height:10px;border:solid var(--surface);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .calsum{margin-top:10px;font-size:.82rem;color:var(--muted)}
+.cell.sel{background:#e6ecf7;outline:2px solid var(--accent);outline-offset:-2px}
+.cell.fut .dn{opacity:.6}
+.cell .ev{font-size:.6rem;line-height:1.25;background:var(--accent);color:#fff;border-radius:3px;padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cell .ev.more{background:none;color:var(--muted)}
+.calsel{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.calsel .tin{margin-top:10px}
+.evlist{list-style:none;margin:8px 0 0;padding:0}
+.evlist li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--line)}
+.evlist li span:first-child{flex:1;min-width:0}
+.evlist .st{font-size:.72rem;color:var(--muted)}
 .ttab{width:100%;border-collapse:collapse;margin-top:14px;font-size:.88rem}
 .ttab th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line);padding:6px 4px}
 .ttab td{border-bottom:1px dashed var(--line);padding:9px 4px;vertical-align:top;overflow-wrap:anywhere}
@@ -262,7 +272,7 @@ const SEED2=[{"id": "asa", "title": "朝の確認チェック", "subtitle": "6:3
 
 (function(){
 "use strict";
-const VER="1.6.0", GOAL=0.8;
+const VER="1.7.0", GOAL=0.8;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=p=>p+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,7);
@@ -287,7 +297,7 @@ if(!D.todos){D.todos={};TSEED.forEach((t,i)=>{const id="tseed"+i;if(!D.tombs[id]
 D.settings=D.settings||{};D.tdone=D.tdone||{};
 SEED2.forEach(x=>{if(!D.lists[x.id]&&!D.tombs[x.id])D.lists[x.id]=clone(x)});
 const S={eOpen:new Set(),listId:LS.get("dc.list",null),date:todayStr(),edit:false,editing:null,draft:null,openDet:new Set(),
-  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,tOpen:null,tHist:LS.get("dc.thist",[]),tMsg:"",tBusy:false};
+  collapsed:new Set(LS.get("dc.collapsed",[])),onlyOpen:LS.get("dc.only",false),listening:false,confirm:null,addingList:false,mode:"check",calYM:null,calSel:null,tOpen:null,tHist:LS.get("dc.thist",[]),tMsg:"",tBusy:false};
 function pushHist(label,before){const d=new Date();S.tHist.unshift({label,before,tm:(d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+":"+pad(d.getMinutes())});S.tHist=S.tHist.slice(0,5);LS.set("dc.thist",S.tHist)}
 
 function persist(){LS.set("dc.data",D)}
@@ -542,32 +552,37 @@ function renderCal(){
   let h=`<div class="calhead"><button class="navbtn" data-act="cal-prev" aria-label="前の月">‹</button><h1>${y}年${m}月</h1><button class="navbtn" data-act="cal-next" aria-label="次の月">›</button></div>`;
   h+=`<div class="cal">`+["日","月","火","水","木","金","土"].map((x,i)=>`<div class="wd ${i===0?"sun":i===6?"sat":""}">${x}</div>`).join("");
   for(let i=0;i<w0;i++)h+=`<div class="cell out"></div>`;
-  let okN=0;
-  for(let d=1;d<=days;d++){const ds=y+"-"+pad(m)+"-"+pad(d),wd=(w0+d-1)%7,hn=H[ds],ok=l&&ds<=t&&ratio(l,ds)>=GOAL;if(ok)okN++;
-    h+=`<button class="cell ${wd===0?"sun":wd===6?"sat":""} ${hn?"hol":""} ${ds===t?"today":""}" data-act="cal-day" data-date="${ds}" ${ds>t?"disabled":""} aria-label="${ds}${hn?" "+hn:""}${ok?" 達成":""}"><span class="dn">${d}</span>${hn?`<span class="hn">${esc(hn)}</span>`:""}${ok?'<span class="ok"></span>':""}</button>`}
-  h+=`</div><div class="calsum">${l?esc(l.title)+"："+okN+"日達成（80%以上）。日付を押すとその日のチェックを開きます。":""}</div>`;
-  $("calview").innerHTML=h;
+  let okN=0;const sel=S.calSel||t,EV={};Object.values(D.todos||{}).forEach(x=>{if(x.start)(EV[x.start]=EV[x.start]||[]).push(x)});
+  for(let d=1;d<=days;d++){const ds=y+"-"+pad(m)+"-"+pad(d),wd=(w0+d-1)%7,hn=H[ds],ok=l&&ds<=t&&ratio(l,ds)>=GOAL,ev=EV[ds]||[];if(ok)okN++;
+    h+=`<button class="cell ${wd===0?"sun":wd===6?"sat":""} ${hn?"hol":""} ${ds===t?"today":""} ${ds===sel?"sel":""} ${ds>t?"fut":""}" data-act="cal-day" data-date="${ds}" aria-label="${ds}${hn?" "+hn:""}${ok?" 達成":""}"><span class="dn">${d}</span>${hn?`<span class="hn">${esc(hn)}</span>`:""}${ev.map(x=>`<span class="ev">${esc(x.text)}</span>`).slice(0,2).join("")}${ev.length>2?`<span class="ev more">+${ev.length-2}</span>`:""}${ok?'<span class="ok"></span>':""}</button>`}
+  const sv=EV[sel]||[],fut=sel>t;
+  h+=`</div><div class="calsum">${l?esc(l.title)+"："+okN+"日達成（80%以上）。":""}日付を押すと選択、選択中の日付をもう一度押すとその日のチェックを開きます。</div>`;
+  h+=`<div class="calsel"><div class="inl"><b>${(+sel.slice(5,7))}/${(+sel.slice(8,10))}（${wd(sel)}）</b><span class="spacer"></span>${sel<=t?`<button class="btn" data-act="cal-open">この日のチェックを開く</button>`:""}</div>
+    ${sv.length?`<ul class="evlist">${sv.map(x=>`<li><span>${esc(x.text)}</span><span class="st">${x.start<=t?"TODOに表示中":"この日からTODOに表示"}</span><button class="btn del" data-act="c-del" data-id="${esc(x.id)}">${S.confirm==="c"+x.id?"本当に消す":"消す"}</button></li>`).join("")}</ul>`:""}
+    <div class="tin"><div class="tbox"><textarea id="c-input" placeholder="${fut?esc((+sel.slice(5,7))+"/"+(+sel.slice(8,10)))+"からTODOに出す内容":"TODOに追加する内容"}"></textarea></div>${micOK()?`<button class="mic ${S.listening?"on":""}" data-act="t-mic" aria-label="音声入力">🎤</button>`:""}<button class="btn pri tsend" data-act="c-send" ${S.tBusy?"disabled":""}>${S.tBusy?"処理中":"送信"}</button></div>
+    ${S.cMsg?`<div class="tres"><div>${esc(S.cMsg)}</div></div>`:""}</div>`;
+  const keep=$("c-input")?$("c-input").value:"";$("calview").innerHTML=h;$("c-input").value=keep;
 }
 
 /* ---------- TODO (Gemini) ---------- */
-const todoArr=()=>Object.values(D.todos||{}).sort((a,b)=>(a.order||0)-(b.order||0));
+const todoArr=()=>Object.values(D.todos||{}).filter(t=>!t.start||t.start<=todayStr()).sort((a,b)=>(a.order||0)-(b.order||0));
 const daysSince=s=>Math.max(0,Math.round((new Date(todayStr()+"T12:00:00")-new Date(s+"T12:00:00"))/864e5));
 const fmtDue=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||"")?(+d.slice(5,7))+"/"+(+d.slice(8,10)):"/";
 const micOK=()=>!!((N&&N.startVoice)||window.SpeechRecognition||window.webkitSpeechRecognition);
-let rec=null;
+let rec=null;const micId=()=>S.mode==="cal"?"c-input":"t-input",reMic=()=>S.mode==="cal"?renderCal():renderTodo();
 function startMic(){
   if(S.listening){if(rec)try{rec.stop()}catch(e){}return}
   if(N&&N.startVoice){N.startVoice();return}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
   rec=new SR();rec.lang="ja-JP";rec.interimResults=true;rec.continuous=false;
-  const el=$("t-input"),base=el.value?el.value.replace(/\s+$/,"")+" ":"";
-  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;$("t-input").value=base+t};
+  const mid=micId(),el=$(mid),base=el.value?el.value.replace(/\s+$/,"")+" ":"";
+  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;const x=$(mid);if(x)x.value=base+t};
   rec.onerror=e=>{if(e.error==="not-allowed")toast("マイクの使用が許可されていません")};
-  rec.onend=()=>{S.listening=false;rec=null;renderTodo();$("t-input").focus()};
-  S.listening=true;renderTodo();try{rec.start()}catch(e){S.listening=false;renderTodo()}
+  rec.onend=()=>{S.listening=false;rec=null;reMic();const x=$(micId());x&&x.focus()};
+  S.listening=true;reMic();try{rec.start()}catch(e){S.listening=false;reMic()}
 }
 window.__dcToast=m=>toast(m);
-window.__dcVoice=t=>{if(!t)return;const el=$("t-input");if(!el)return;el.value=(el.value?el.value.replace(/\s+$/,"")+" ":"")+t;el.focus()};
+window.__dcVoice=t=>{if(!t)return;const el=$(micId());if(!el)return;el.value=(el.value?el.value.replace(/\s+$/,"")+" ":"")+t;el.focus()};
 function renderTodo(){
   const arr=todoArr(),key=(D.settings.gemini||{}).key||"";
   let h=`<table class="ttab"><thead><tr><th>No</th><th>TODO</th><th>期限</th><th>状態</th></tr></thead><tbody>`;
@@ -584,11 +599,11 @@ function renderTodo(){
   const keepVal=$("t-input")?$("t-input").value:"";$("todoview").innerHTML=h;$("t-input").value=keepVal;
 }
 function touchTodos(){persist();schedulePush()}
-function applyOps(ops){
+function applyOps(ops,extra){
   const arr=todoArr(),before=JSON.stringify(D.todos),now=Date.now(),log=[];let maxO=arr.reduce((m,t)=>Math.max(m,t.order||0),0);
   for(const o of ops||[]){
     const t=o.no?arr[o.no-1]:null;
-    if(o.op==="add"&&o.text){const id=uid("t");D.todos[id]={id,text:String(o.text).trim().slice(0,60),due:o.due||"",added:todayStr(),status:"",order:++maxO,updated:now};log.push("追加："+D.todos[id].text)}
+    if(o.op==="add"&&o.text){const id=uid("t");D.todos[id]=Object.assign({id,text:String(o.text).trim().slice(0,60),due:o.due||"",added:todayStr(),status:"",order:++maxO,updated:now},extra||{});if(extra&&extra.start&&!o.due)D.todos[id].due=extra.start;log.push("追加："+D.todos[id].text)}
     else if((o.op==="done"||o.op==="delete")&&t&&D.todos[t.id]){D.tdone[t.id]={text:t.text,date:todayStr(),updated:now};D.tombs[t.id]=now;delete D.todos[t.id];log.push("完了："+t.text)}
     else if(o.op==="edit"&&t&&D.todos[t.id]){const x=D.todos[t.id];if(o.text)x.text=String(o.text).trim().slice(0,60);if(o.due)x.due=o.due;x.updated=now;log.push("変更："+x.text)}
   }
@@ -654,6 +669,17 @@ async function geminiOps(text){
   }
   throw new Error(last||"Geminiに接続できません");
 }
+async function sendCal(){
+  const el=$("c-input"),text=el.value.trim(),t=todayStr(),sel=S.calSel||t;if(!text||S.tBusy)return;
+  S.tBusy=true;S.cMsg="";renderCal();let ops,note="";
+  try{
+    try{ops=await geminiOps(text)}catch(e){ops=ruleOps(text);note=e.message==="nokey"?"":"（AIを使えなかったため簡易反映："+e.message+"）"}
+    ops=(ops||[]).filter(o=>o.op==="add");if(!ops.length&&text.length<=60)ops=[{op:"add",text,due:""}];
+    const log=applyOps(ops,sel>t?{start:sel,added:sel}:null);
+    if(log.length){$("c-input").value="";S.cMsg=log.join("\n")+(sel>t?"\n→ "+(+sel.slice(5,7))+"/"+(+sel.slice(8,10))+"からTODOに表示します":"")+(note?"\n"+note:"")}else S.cMsg="追加できる内容がありませんでした"+(note?"\n"+note:"")
+  }catch(e){S.cMsg="エラー："+(e.message||e)}
+  finally{S.tBusy=false;renderCal()}
+}
 async function sendTodo(){
   const el=$("t-input"),text=el.value.trim();if(!text||S.tBusy)return;
   S.tBusy=true;S.tMsg="";renderTodo();let ops,note="";
@@ -676,7 +702,7 @@ function renderMode(){
   bt.textContent=m==="todo"?"✓ チェックに戻る":m==="cal"?"📝":"📝 TODO";bt.classList.toggle("back",m==="todo");bt.classList.toggle("small",m==="cal");
 }
 function render(){renderTop();
-  if(S.mode==="cal"){renderMode();renderCal();return}
+  if(S.mode==="cal"){renderMode();const ae=document.activeElement;if(!(ae&&ae.id==="c-input")&&!S.tBusy)renderCal();return}
   if(S.mode==="todo"){renderMode();if(!S.tBusy&&document.activeElement&&!/^(te-|g-key)/.test(document.activeElement.id||""))renderTodo();return}
   renderSide();renderMode();if(S.editing)return;const ae=document.activeElement;if(ae&&ae.classList&&$("main").contains(ae)&&(ae.classList.contains("vin")||(S.edit&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&ae.type!=="checkbox")))return;renderMain()}
 
@@ -691,12 +717,12 @@ document.addEventListener("change",e=>{
 const vT={};
 function flushV(el){const l=cur();if(!l)return;const id=el.dataset.vitem||(el.dataset.vnote+"~n");clearTimeout(vT[id]);const v=el.value.trim();if((rawV(l.id,id,S.date)||"")!==v)setVal(l.id,id,v)}
 document.addEventListener("input",e=>{const el=e.target;if(!el.dataset||!(el.dataset.vitem||el.dataset.vnote))return;const id=el.dataset.vitem||(el.dataset.vnote+"~n");clearTimeout(vT[id]);vT[id]=setTimeout(()=>{flushV(el);renderTop()},700)});
-document.addEventListener("keydown",e=>{if(e.target.id==="t-input"&&e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();sendTodo()}});
+document.addEventListener("keydown",e=>{if((e.target.id==="t-input"||e.target.id==="c-input")&&e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();e.target.id==="c-input"?sendCal():sendTodo()}});
 document.addEventListener("toggle",e=>{const eo=e.target.dataset&&e.target.dataset.eo;if(eo){e.target.open?S.eOpen.add(eo):S.eOpen.delete(eo);return}const id=e.target.dataset&&e.target.dataset.det;if(!id)return;e.target.open?S.openDet.add(id):S.openDet.delete(id)},true);
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");if(!b||b.dataset.act==="check")return;
   const a=b.dataset.act,l=cur(),t=todayStr();
-  if(!["reset","i-del","s-del","l-del"].includes(a))S.confirm=null;
+  if(!["reset","i-del","s-del","l-del","c-del"].includes(a))S.confirm=null;
   const findSec=id=>l.sections.find(s=>s.id===id);
   const findItem=id=>{for(const s of l.sections){const i=s.items.findIndex(x=>x.id===id);if(i>=0)return[s,i]}return[null,-1]};
   switch(a){
@@ -744,7 +770,10 @@ document.addEventListener("click",e=>{
     case"mode-cal":S.mode=S.mode==="cal"?"check":"cal";S.calYM=S.date.slice(0,7);S.editing=null;scrollTo(0,0);break;
     case"mode-todo":S.mode=S.mode==="todo"?"check":"todo";S.editing=null;S.tOpen=null;scrollTo(0,0);break;
     case"cal-prev":case"cal-next":{const[y,m]=S.calYM.split("-").map(Number),d=new Date(y,m-1+(a==="cal-next"?1:-1),1);S.calYM=d.getFullYear()+"-"+pad(d.getMonth()+1);break}
-    case"cal-day":S.date=b.dataset.date;S.mode="check";scrollTo(0,0);break;
+    case"cal-day":{const ds=b.dataset.date;if((S.calSel||t)===ds&&ds<=t){S.date=ds;S.mode="check";scrollTo(0,0);break}S.calSel=ds;S.cMsg="";renderCal();return}
+    case"cal-open":S.date=S.calSel||t;S.mode="check";scrollTo(0,0);break;
+    case"c-send":sendCal();return;
+    case"c-del":{const id=b.dataset.id,x=D.todos[id];if(!x)return;if(S.confirm!=="c"+id){S.confirm="c"+id;renderCal();return}pushHist("削除："+x.text,JSON.stringify(D.todos));D.tombs[id]=Date.now();delete D.todos[id];S.confirm=null;touchTodos();renderCal();return}
     case"t-open":S.tOpen=S.tOpen===b.dataset.id?null:b.dataset.id;renderTodo();return;
     case"t-save":{const x=D.todos[b.dataset.id];if(!x)return;const tx=$("te-text").value.trim();if(!tx){toast("TODOを入れてください");return}
       x.text=tx;x.due=$("te-due").value||"";x.status=$("te-st").value.trim();x.updated=Date.now();S.tOpen=null;touchTodos();toast("保存しました");renderTodo();return}
